@@ -13,6 +13,8 @@ import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Student, Semester } from "@/lib/db";
+import AddStudentDialog from "@/components/students/AddStudentDialog";
+import ImportStudentsDialog from "@/components/students/ImportStudentsDialog";
 
 const Students = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,69 +22,80 @@ const Students = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
+  const [isImportStudentsDialogOpen, setIsImportStudentsDialogOpen] = useState(false);
   const { toast } = useToast();
 
+  const fetchStudentsAndSemesters = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get semesters
+      const { data: semestersData, error: semestersError } = await supabase
+        .from('semesters')
+        .select('*')
+        .order('id');
+      
+      if (semestersError) throw semestersError;
+      setSemesters(semestersData || []);
+      
+      // Get students
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select(`
+          *,
+          semester:semesters (name)
+        `)
+        .order('semester_id', { ascending: true })
+        .order('roll_number', { ascending: true });
+      
+      if (studentsError) throw studentsError;
+      setStudents(studentsData || []);
+    } catch (error: any) {
+      toast({
+        title: "Error loading data",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Get semesters
-        const { data: semestersData, error: semestersError } = await supabase
-          .from('semesters')
-          .select('*')
-          .order('id');
-        
-        if (semestersError) throw semestersError;
-        setSemesters(semestersData || []);
-        
-        // Get students
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('students')
-          .select(`
-            *,
-            semester:semesters (name)
-          `)
-          .order('semester_id', { ascending: true })
-          .order('roll_number', { ascending: true });
-        
-        if (studentsError) throw studentsError;
-        setStudents(studentsData || []);
-      } catch (error: any) {
-        toast({
-          title: "Error loading data",
-          description: error.message,
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchData();
+    fetchStudentsAndSemesters();
   }, [toast]);
 
-  const handleImport = () => {
-    // In a real app, this would open a file dialog and process the file
-    toast({
-      title: "Import Feature",
-      description: "This feature will be implemented in a future update."
-    });
-  };
-
   const handleExport = () => {
-    // In a real app, this would generate and download a CSV file
-    toast({
-      title: "Export Feature",
-      description: "This feature will be implemented in a future update."
-    });
-  };
+    if (students.length === 0) {
+      toast({
+        title: "No Students to Export",
+        description: "There are no student records to export.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-  const handleAddStudent = () => {
-    // In a real app, this would open a modal to add a new student
+    const headers = ["Roll Number", "Student Name", "Email", "Semester"];
+    const csvRows = students.map(student => [
+      student.roll_number,
+      student.name,
+      student.email || "",
+      (student as any).semester?.name || `Semester ${student.semester_id}`
+    ].map(field => `"${field}"`).join(',')); // Wrap fields in quotes to handle commas
+
+    const csvString = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'students_data.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
     toast({
-      title: "Add Student",
-      description: "This feature will be implemented in a future update."
+      title: "Students Exported",
+      description: "Student data has been downloaded as students_data.csv.",
     });
   };
 
@@ -95,8 +108,8 @@ const Students = () => {
       
       if (error) throw error;
       
-      // Remove student from local state
-      setStudents(students.filter(student => student.id !== id));
+      // Refresh student list
+      fetchStudentsAndSemesters();
       
       toast({
         title: "Student Deleted",
@@ -113,7 +126,7 @@ const Students = () => {
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          student.roll_number.includes(searchTerm);
+                          student.roll_number.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesClass = selectedClass === "all" || student.semester_id === parseInt(selectedClass);
     return matchesSearch && matchesClass;
   });
@@ -151,7 +164,7 @@ const Students = () => {
                 </CardDescription>
               </div>
               <div className="flex space-x-2 mt-2 md:mt-0">
-                <Button onClick={handleImport} variant="outline">
+                <Button onClick={() => setIsImportStudentsDialogOpen(true)} variant="outline">
                   <Upload className="mr-2 h-4 w-4" />
                   Import
                 </Button>
@@ -159,7 +172,7 @@ const Students = () => {
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
-                <Button onClick={handleAddStudent}>
+                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Student
                 </Button>
@@ -213,7 +226,7 @@ const Students = () => {
                       <Badge variant="outline">{student.roll_number}</Badge>
                     </TableCell>
                     <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>{student.semester?.name || `Semester ${student.semester_id}`}</TableCell>
+                    <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
                     <TableCell>{student.email || "-"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
@@ -236,7 +249,8 @@ const Students = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        {/* The old import card is replaced by the dialog */}
+        {/* <Card>
           <CardHeader>
             <CardTitle>Import Students</CardTitle>
             <CardDescription>
@@ -250,7 +264,7 @@ const Students = () => {
               <p className="mt-1 text-sm text-gray-500">
                 Drag and drop your CSV or Excel file here, or click to browse
               </p>
-              <Button variant="outline" className="mt-4" onClick={handleImport}>
+              <Button variant="outline" className="mt-4" onClick={() => setIsImportStudentsDialogOpen(true)}>
                 Select File
               </Button>
               <p className="mt-2 text-xs text-gray-500">
@@ -258,8 +272,18 @@ const Students = () => {
               </p>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
+      <AddStudentDialog 
+        isOpen={isAddStudentDialogOpen} 
+        onClose={() => setIsAddStudentDialogOpen(false)} 
+        onStudentAdded={fetchStudentsAndSemesters} 
+      />
+      <ImportStudentsDialog 
+        isOpen={isImportStudentsDialogOpen} 
+        onClose={() => setIsImportStudentsDialogOpen(false)} 
+        onImportComplete={fetchStudentsAndSemesters} 
+      />
     </div>
   );
 };
