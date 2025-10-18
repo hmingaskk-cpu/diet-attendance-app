@@ -85,7 +85,8 @@ const Attendance = () => {
           `)
           .eq('date', date)
           .eq('period', period)
-          .eq('semester_id', id);
+          .eq('semester_id', id)
+          .eq('faculty_id', user.id); // Ensure we only fetch records submitted by this faculty
         
         if (attendanceError) throw attendanceError;
         
@@ -149,13 +150,15 @@ const Attendance = () => {
         is_present: attendance[student.id.toString()] ?? false
       }));
 
-      // Delete existing records for this date/period/semester
+      // Delete existing records for this date/period/semester/faculty_id
+      // This ensures a faculty member only updates their own submitted records
       await supabase
         .from('attendance_records')
         .delete()
         .eq('date', date)
         .eq('period', period)
-        .eq('semester_id', id);
+        .eq('semester_id', id)
+        .eq('faculty_id', facultyId); // Crucial addition for faculty-specific updates
 
       // Insert new records
       const { error } = await supabase
