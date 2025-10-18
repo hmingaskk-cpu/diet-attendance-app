@@ -10,6 +10,39 @@ import { useToast } from "@/hooks/use-toast";
 import { createStudent, Semester } from "@/lib/db";
 import { supabase } from "@/lib/supabaseClient";
 
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const addStudentFormSchema = z.object({
+  name: z.string().min(2, {
+    message: "Student name must be at least 2 characters.",
+  }).max(100, {
+    message: "Student name must not be longer than 100 characters.",
+  }),
+  rollNumber: z.string().min(1, {
+    message: "Roll number is required.",
+  }).max(20, {
+    message: "Roll number must not be longer than 20 characters.",
+  }),
+  email: z.string().email({
+    message: "Please enter a valid email address.",
+  }).optional().or(z.literal("")), // Allow empty string for optional email
+  semesterId: z.string().min(1, {
+    message: "Please select a semester.",
+  }),
+});
+
+type AddStudentFormValues = z.infer<typeof addStudentFormSchema>;
+
 interface AddStudentDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -17,13 +50,19 @@ interface AddStudentDialogProps {
 }
 
 const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogProps) => {
-  const [name, setName] = useState("");
-  const [rollNumber, setRollNumber] = useState("");
-  const [email, setEmail] = useState("");
-  const [semesterId, setSemesterId] = useState<string>("");
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  const form = useForm<AddStudentFormValues>({
+    resolver: zodResolver(addStudentFormSchema),
+    defaultValues: {
+      name: "",
+      rollNumber: "",
+      email: "",
+      semesterId: "",
+    },
+  });
 
   useEffect(() => {
     const fetchSemesters = async () => {
@@ -45,39 +84,24 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
     
     if (isOpen) {
       fetchSemesters();
-      // Reset form fields when dialog opens
-      setName("");
-      setRollNumber("");
-      setEmail("");
-      setSemesterId("");
+      form.reset(); // Reset form fields when dialog opens
     }
-  }, [isOpen, toast]);
+  }, [isOpen, toast, form]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (values: AddStudentFormValues) => {
     setIsLoading(true);
-
-    if (!name || !rollNumber || !semesterId) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive"
-      });
-      setIsLoading(false);
-      return;
-    }
 
     try {
       await createStudent({
-        name,
-        roll_number: rollNumber,
-        email: email || null,
-        semester_id: parseInt(semesterId)
+        name: values.name,
+        roll_number: values.rollNumber,
+        email: values.email || null, // Ensure null for empty optional email
+        semester_id: parseInt(values.semesterId)
       });
 
       toast({
         title: "Student Added",
-        description: `${name} has been added successfully.`,
+        description: `${values.name} has been added successfully.`,
       });
       onStudentAdded();
       onClose();
@@ -101,60 +125,90 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
             Enter the details for the new student. Click save when you're done.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="student-name">Student Name</Label>
-              <Input
-                id="student-name"
-                placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="grid gap-4 py-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Student Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="John Doe"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="rollNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Roll Number</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="DIET/2023/001"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="john.doe@example.com"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="semesterId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Semester</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select semester" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {semesters.map(semester => (
+                          <SelectItem key={semester.id} value={semester.id.toString()}>
+                            {semester.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="roll-number">Roll Number</Label>
-              <Input
-                id="roll-number"
-                placeholder="DIET/2023/001"
-                value={rollNumber}
-                onChange={(e) => setRollNumber(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="student-email">Email (Optional)</Label>
-              <Input
-                id="student-email"
-                type="email"
-                placeholder="john.doe@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="semester">Semester</Label>
-              <Select value={semesterId} onValueChange={setSemesterId} required>
-                <SelectTrigger id="semester">
-                  <SelectValue placeholder="Select semester" />
-                </SelectTrigger>
-                <SelectContent>
-                  {semesters.map(semester => (
-                    <SelectItem key={semester.id} value={semester.id.toString()}>
-                      {semester.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save Student"}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Saving..." : "Save Student"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
