@@ -63,6 +63,16 @@ export const createStudent = async (student: Omit<Student, 'id' | 'created_at' |
   return data
 }
 
+export const createMultipleStudents = async (students: Omit<Student, 'id' | 'created_at' | 'updated_at'>[]) => {
+  const { data, error } = await supabase
+    .from('students')
+    .insert(students)
+    .select()
+  
+  if (error) throw error
+  return data
+}
+
 export const updateStudent = async (id: number, student: Partial<Student>) => {
   const { data, error } = await supabase
     .from('students')
