@@ -1,14 +1,23 @@
 "use client";
 
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, Calendar, BarChart3, Users, User, LogOut } from "lucide-react";
+import { logout } from "@/lib/auth";
 
 const Navigation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+
+  const handleLogout = async () => {
+    const { success } = await logout();
+    if (success) {
+      navigate("/login");
+    }
   };
 
   return (
@@ -66,7 +75,7 @@ const Navigation = () => {
           </div>
           
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4" />
               <span className="ml-1 hidden sm:inline">Logout</span>
             </Button>

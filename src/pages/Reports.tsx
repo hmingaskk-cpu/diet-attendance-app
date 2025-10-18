@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,33 +11,207 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Download, Filter } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import Navigation from "@/components/Navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "@/hooks/use-toast";
+import { Semester, Student } from "@/lib/db";
 
 const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState("");
+  const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  const [studentReports, setStudentReports] = useState<any[]>([]);
+  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Mock data for reports
-  const attendanceData = [
-    { date: "2023-10-01", present: 42, absent: 3 },
-    { date: "2023-10-02", present: 39, absent: 6 },
-    { date: "2023-10-03", present: 41, absent: 4 },
-    { date: "2023-10-04", present: 40, absent: 5 },
-    { date: "2023-10-05", present: 43, absent: 2 },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get semesters
+        const { data: semestersData, error: semestersError } = await supabase
+          .from('semesters')
+          .select('*')
+          .order('id');
+        
+        if (semestersError) throw semestersError;
+        setSemesters(semestersData || []);
+        
+        // Get students
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select('*')
+          .order('name');
+        
+        if (studentsError) throw studentsError;
+        setStudents(studentsData || []);
+        
+        // Set default date range to last 30 days
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        
+        setDateRange({
+          from: thirtyDaysAgo.toISOString().split('T')[0],
+          to: today.toISOString().split('T')[0]
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error loading data",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [toast]);
 
-  const studentReports = [
-    { id: "1", name: "Airi Satou", roll: "001", class: "1st Semester", attendance: 92 },
-    { id: "2", name: "Angelica Ramos", roll: "002", class: "1st Semester", attendance: 85 },
-    { id: "3", name: "Ashton Cox", roll: "003", class: "2nd Semester", attendance: 95 },
-    { id: "4", name: "Bradley Greer", roll: "004", class: "2nd Semester", attendance: 78 },
-    { id: "5", name: "Brenden Wagner", roll: "005", class: "3rd Semester", attendance: 88 },
-  ];
+  useEffect(() => {
+    const fetchReportData = async () => {
+      if (!dateRange.from || !dateRange.to) return;
+      
+      try {
+        // Fetch attendance data for chart
+        let query = supabase
+          .from('attendance_records')
+          .select(`
+            date,
+            is_present
+          `)
+          .gte('date', dateRange.from)
+          .lte('date', dateRange.to);
+        
+        if (selectedClass !== "all") {
+          query = query.eq('semester_id', selectedClass);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        // Process data for chart
+        const chartData: Record<string, { date: string; present: number; absent: number }> = {};
+        
+        data?.forEach(record => {
+          const date = record.date;
+          if (!chartData[date]) {
+            chartData[date] = { date, present: 0, absent: 0 };
+          }
+          
+          if (record.is_present) {
+            chartData[date].present += 1;
+          } else {
+            chartData[date].absent += 1;
+          }
+        });
+        
+        setAttendanceData(Object.values(chartData));
+        
+        // Fetch student attendance percentages
+        const studentAttendanceQuery = supabase
+          .from('attendance_records')
+          .select(`
+            student_id,
+            is_present,
+            student:students (name, roll_number),
+            semester:semesters (name)
+          `)
+          .gte('date', dateRange.from)
+          .lte('date', dateRange.to);
+        
+        if (selectedClass !== "all") {
+          studentAttendanceQuery.eq('semester_id', selectedClass);
+        }
+        
+        const { data: studentData, error: studentError } = await studentAttendanceQuery;
+        
+        if (studentError) throw studentError;
+        
+        // Process student attendance data
+        const studentMap: Record<number, { 
+          id: number; 
+          name: string; 
+          roll: string; 
+          class: string; 
+          total: number; 
+          present: number 
+        }> = {};
+        
+        studentData?.forEach(record => {
+          const studentId = record.student_id;
+          if (!studentMap[studentId]) {
+            studentMap[studentId] = {
+              id: studentId,
+              name: record.student?.name || "Unknown",
+              roll: record.student?.roll_number || "Unknown",
+              class: record.semester?.name || "Unknown",
+              total: 0,
+              present: 0
+            };
+          }
+          
+          studentMap[studentId].total += 1;
+          if (record.is_present) {
+            studentMap[studentId].present += 1;
+          }
+        });
+        
+        // Calculate percentages
+        const studentReports = Object.values(studentMap).map(student => ({
+          ...student,
+          attendance: student.total > 0 ? Math.round((student.present / student.total) * 100) : 0
+        }));
+        
+        setStudentReports(studentReports);
+      } catch (error: any) {
+        toast({
+          title: "Error loading report data",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    };
+    
+    if (!isLoading) {
+      fetchReportData();
+    }
+  }, [dateRange, selectedClass, isLoading, toast]);
+
+  const handleGenerateReport = () => {
+    // This will trigger the useEffect above
+    toast({
+      title: "Report Generated",
+      description: "Attendance report has been updated."
+    });
+  };
 
   const handleDownload = () => {
     // In a real app, this would generate and download a report
-    alert("Report download initiated");
+    toast({
+      title: "Download Report",
+      description: "Report download functionality will be implemented in a future update."
+    });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading report data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -91,10 +265,11 @@ const Reports = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Classes</SelectItem>
-                    <SelectItem value="1">1st Semester</SelectItem>
-                    <SelectItem value="2">2nd Semester</SelectItem>
-                    <SelectItem value="3">3rd Semester</SelectItem>
-                    <SelectItem value="4">4th Semester</SelectItem>
+                    {semesters.map(semester => (
+                      <SelectItem key={semester.id} value={semester.id.toString()}>
+                        {semester.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -109,7 +284,7 @@ const Reports = () => {
               </div>
             </div>
             <div className="flex justify-end mt-4">
-              <Button>
+              <Button onClick={handleGenerateReport}>
                 <Filter className="mr-2 h-4 w-4" />
                 Generate Report
               </Button>

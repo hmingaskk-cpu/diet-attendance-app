@@ -1,23 +1,102 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Users, FileText, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
-  const [facultyName] = useState("Dr. John Doe");
-  const [role] = useState("Faculty");
+  const [facultyName, setFacultyName] = useState("");
+  const [role, setRole] = useState("");
+  const [semesters, setSemesters] = useState<any[]>([]);
+  const [studentCounts, setStudentCounts] = useState<Record<number, number>>({});
+  const [todayAttendanceCount, setTodayAttendanceCount] = useState(0);
+  const [reportCount, setReportCount] = useState(0);
+  const { toast } = useToast();
 
-  const semesters = [
-    { id: 1, name: "1st Semester", studentCount: 45 },
-    { id: 2, name: "2nd Semester", studentCount: 42 },
-    { id: 3, name: "3rd Semester", studentCount: 38 },
-    { id: 4, name: "4th Semester", studentCount: 40 },
-  ];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Get user details
+          const { data: userDetails, error: userError } = await supabase
+            .from('users')
+            .select('name, role')
+            .eq('id', user.id)
+            .single();
+          
+          if (userError) throw userError;
+          
+          setFacultyName(userDetails?.name || "Faculty");
+          setRole(userDetails?.role || "Faculty");
+          
+          // Get semesters
+          const { data: semestersData, error: semestersError } = await supabase
+            .from('semesters')
+            .select('*')
+            .order('id');
+          
+          if (semestersError) throw semestersError;
+          setSemesters(semestersData || []);
+          
+          // Get student counts for each semester
+          const counts: Record<number, number> = {};
+          for (const semester of semestersData || []) {
+            const { count, error } = await supabase
+              .from('students')
+              .select('*', { count: 'exact', head: true })
+              .eq('semester_id', semester.id);
+            
+            if (error) throw error;
+            counts[semester.id] = count || 0;
+          }
+          setStudentCounts(counts);
+          
+          // Get today's attendance count
+          const today = new Date().toISOString().split('T')[0];
+          const { count: attendanceCount, error: attendanceError } = await supabase
+            .from('attendance_records')
+            .select('*', { count: 'exact', head: true })
+            .eq('date', today)
+            .eq('faculty_id', user.id);
+          
+          if (attendanceError) throw attendanceError;
+          setTodayAttendanceCount(attendanceCount || 0);
+          
+          // Get this month's report count
+          const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+            .toISOString().split('T')[0];
+          
+          const { count: reportCount, error: reportError } = await supabase
+            .from('attendance_records')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', firstDayOfMonth)
+            .eq('faculty_id', user.id);
+          
+          if (reportError) throw reportError;
+          setReportCount(reportCount || 0);
+        }
+      } catch (error: any) {
+        toast({
+          title: "Error loading dashboard",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    };
+    
+    fetchDashboardData();
+  }, [toast]);
+
+  // Calculate total students
+  const totalStudents = Object.values(studentCounts).reduce((sum, count) => sum + count, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -38,7 +117,7 @@ const Dashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4</div>
+              <div className="text-2xl font-bold">{semesters.length}</div>
               <p className="text-xs text-muted-foreground">Semesters</p>
             </CardContent>
           </Card>
@@ -48,7 +127,7 @@ const Dashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">165</div>
+              <div className="text-2xl font-bold">{totalStudents}</div>
               <p className="text-xs text-muted-foreground">Across all semesters</p>
             </CardContent>
           </Card>
@@ -58,7 +137,7 @@ const Dashboard = () => {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12</div>
+              <div className="text-2xl font-bold">{todayAttendanceCount}</div>
               <p className="text-xs text-muted-foreground">Periods completed</p>
             </CardContent>
           </Card>
@@ -68,7 +147,7 @@ const Dashboard = () => {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">24</div>
+              <div className="text-2xl font-bold">{reportCount}</div>
               <p className="text-xs text-muted-foreground">This month</p>
             </CardContent>
           </Card>
@@ -87,7 +166,7 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                       <div>
                         <h3 className="font-medium">{semester.name}</h3>
-                        <p className="text-sm text-gray-500">{semester.studentCount} students</p>
+                        <p className="text-sm text-gray-500">{studentCounts[semester.id] || 0} students</p>
                       </div>
                       <Button variant="outline">Take Attendance</Button>
                     </div>

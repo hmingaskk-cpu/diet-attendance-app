@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,44 +10,127 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, Download, Plus, Search, Edit, Trash2 } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "@/hooks/use-toast";
+import { Student, Semester } from "@/lib/db";
 
 const Students = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClass, setSelectedClass] = useState("all");
+  const [students, setStudents] = useState<Student[]>([]);
+  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Mock student data
-  const students = [
-    { id: "1", name: "Airi Satou", roll: "001", class: "1st Semester", email: "airi@example.com" },
-    { id: "2", name: "Angelica Ramos", roll: "002", class: "1st Semester", email: "angelica@example.com" },
-    { id: "3", name: "Ashton Cox", roll: "003", class: "2nd Semester", email: "ashton@example.com" },
-    { id: "4", name: "Bradley Greer", roll: "004", class: "2nd Semester", email: "bradley@example.com" },
-    { id: "5", name: "Brenden Wagner", roll: "005", class: "3rd Semester", email: "brenden@example.com" },
-    { id: "6", name: "Brielle Williamson", roll: "006", class: "3rd Semester", email: "brielle@example.com" },
-    { id: "7", name: "Bruno Nash", roll: "007", class: "4th Semester", email: "bruno@example.com" },
-    { id: "8", name: "Caesar Vance", roll: "008", class: "4th Semester", email: "caesar@example.com" },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get semesters
+        const { data: semestersData, error: semestersError } = await supabase
+          .from('semesters')
+          .select('*')
+          .order('id');
+        
+        if (semestersError) throw semestersError;
+        setSemesters(semestersData || []);
+        
+        // Get students
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select(`
+            *,
+            semester:semesters (name)
+          `)
+          .order('semester_id', { ascending: true })
+          .order('roll_number', { ascending: true });
+        
+        if (studentsError) throw studentsError;
+        setStudents(studentsData || []);
+      } catch (error: any) {
+        toast({
+          title: "Error loading data",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [toast]);
 
   const handleImport = () => {
     // In a real app, this would open a file dialog and process the file
-    alert("Import functionality would open file dialog here");
+    toast({
+      title: "Import Feature",
+      description: "This feature will be implemented in a future update."
+    });
   };
 
   const handleExport = () => {
     // In a real app, this would generate and download a CSV file
-    alert("Export functionality would generate CSV file here");
+    toast({
+      title: "Export Feature",
+      description: "This feature will be implemented in a future update."
+    });
   };
 
   const handleAddStudent = () => {
     // In a real app, this would open a modal to add a new student
-    alert("Add student functionality would open modal here");
+    toast({
+      title: "Add Student",
+      description: "This feature will be implemented in a future update."
+    });
+  };
+
+  const handleDeleteStudent = async (id: number) => {
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Remove student from local state
+      setStudents(students.filter(student => student.id !== id));
+      
+      toast({
+        title: "Student Deleted",
+        description: "The student has been successfully removed."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error deleting student",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          student.roll.includes(searchTerm);
-    const matchesClass = selectedClass === "all" || student.class === `${selectedClass} Semester`;
+                          student.roll_number.includes(searchTerm);
+    const matchesClass = selectedClass === "all" || student.semester_id === parseInt(selectedClass);
     return matchesSearch && matchesClass;
   });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading student data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -103,10 +186,11 @@ const Students = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Classes</SelectItem>
-                    <SelectItem value="1">1st Semester</SelectItem>
-                    <SelectItem value="2">2nd Semester</SelectItem>
-                    <SelectItem value="3">3rd Semester</SelectItem>
-                    <SelectItem value="4">4th Semester</SelectItem>
+                    {semesters.map(semester => (
+                      <SelectItem key={semester.id} value={semester.id.toString()}>
+                        {semester.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -126,17 +210,21 @@ const Students = () => {
                 {filteredStudents.map((student) => (
                   <TableRow key={student.id}>
                     <TableCell>
-                      <Badge variant="outline">{student.roll}</Badge>
+                      <Badge variant="outline">{student.roll_number}</Badge>
                     </TableCell>
                     <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>{student.class}</TableCell>
-                    <TableCell>{student.email}</TableCell>
+                    <TableCell>{student.semester?.name || `Semester ${student.semester_id}`}</TableCell>
+                    <TableCell>{student.email || "-"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
                         <Button variant="outline" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteStudent(student.id)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

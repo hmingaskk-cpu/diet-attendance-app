@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 const SignupForm = () => {
   const [name, setName] = useState("");
@@ -17,20 +18,43 @@ const SignupForm = () => {
   const [role, setRole] = useState("faculty");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate signup process
-    setTimeout(() => {
-      setIsLoading(false);
+    // First, sign up the user
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role
+        }
+      }
+    });
+    
+    if (error) {
+      toast({
+        title: "Signup Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
       toast({
         title: "Account Created",
-        description: "Your account has been created successfully.",
+        description: "Please check your email to confirm your account.",
       });
-      // In a real app, we would redirect to login page here
-    }, 1500);
+      
+      // Redirect to login page after a short delay
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
+    }
+    
+    setIsLoading(false);
   };
 
   return (
@@ -75,6 +99,7 @@ const SignupForm = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  minLength={6}
                 />
               </div>
               <div className="space-y-2">

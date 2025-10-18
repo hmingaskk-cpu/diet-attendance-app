@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,42 +13,110 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { Student, AttendanceRecord } from "@/lib/db";
 
 const Attendance = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [facultyName, setFacultyName] = useState("");
+  const [facultyId, setFacultyId] = useState("");
   const [period, setPeriod] = useState("1");
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectAll, setSelectAll] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
+  const [students, setStudents] = useState<Student[]>([]);
+  const [semesterName, setSemesterName] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock student data - in a real app this would come from the database
-  const students = [
-    { id: "1", name: "Airi Satou", roll: "001" },
-    { id: "2", name: "Angelica Ramos", roll: "002" },
-    { id: "3", name: "Ashton Cox", roll: "003" },
-    { id: "4", name: "Bradley Greer", roll: "004" },
-    { id: "5", name: "Brenden Wagner", roll: "005" },
-    { id: "6", name: "Brielle Williamson", roll: "006" },
-    { id: "7", name: "Bruno Nash", roll: "007" },
-    { id: "8", name: "Caesar Vance", roll: "008" },
-    { id: "9", name: "Cara Stevens", roll: "009" },
-    { id: "10", name: "Cedric Kelly", roll: "010" },
-  ];
-
-  const semesterNames = [
-    "1st Semester",
-    "2nd Semester",
-    "3rd Semester",
-    "4th Semester"
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate("/login");
+          return;
+        }
+        
+        setFacultyId(user.id);
+        
+        // Get user details
+        const { data: userDetails } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+        
+        if (userDetails) {
+          setFacultyName(userDetails.name);
+        }
+        
+        // Get semester details
+        const { data: semesterData } = await supabase
+          .from('semesters')
+          .select('name')
+          .eq('id', id)
+          .single();
+        
+        if (semesterData) {
+          setSemesterName(semesterData.name);
+        }
+        
+        // Get students for this semester
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('semester_id', id)
+          .order('roll_number');
+        
+        if (studentsError) throw studentsError;
+        setStudents(studentsData || []);
+        
+        // Get existing attendance records for this date and period
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance_records')
+          .select(`
+            student_id,
+            is_present
+          `)
+          .eq('date', date)
+          .eq('period', period)
+          .eq('semester_id', id);
+        
+        if (attendanceError) throw attendanceError;
+        
+        // Initialize attendance state with existing records
+        const initialAttendance: Record<string, boolean> = {};
+        attendanceData?.forEach(record => {
+          initialAttendance[record.student_id.toString()] = record.is_present;
+        });
+        
+        setAttendance(initialAttendance);
+      } catch (error: any) {
+        toast({
+          title: "Error loading data",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (id) {
+      fetchData();
+    }
+  }, [id, date, period, navigate, toast]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
     const newAttendance: Record<string, boolean> = {};
     students.forEach(student => {
-      newAttendance[student.id] = checked;
+      newAttendance[student.id.toString()] = checked;
     });
     setAttendance(newAttendance);
   };
@@ -60,7 +128,7 @@ const Attendance = () => {
     }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!facultyName) {
       toast({
         title: "Faculty Name Required",
@@ -70,12 +138,58 @@ const Attendance = () => {
       return;
     }
 
-    // In a real app, this would save to Supabase
-    toast({
-      title: "Attendance Submitted",
-      description: `Attendance for ${semesterNames[Number(id) - 1]} (Period ${period}) has been saved.`,
-    });
+    try {
+      // Prepare attendance records
+      const attendanceRecords = students.map(student => ({
+        date,
+        period: parseInt(period),
+        faculty_id: facultyId,
+        semester_id: parseInt(id || "0"),
+        student_id: student.id,
+        is_present: attendance[student.id.toString()] ?? false
+      }));
+
+      // Delete existing records for this date/period/semester
+      await supabase
+        .from('attendance_records')
+        .delete()
+        .eq('date', date)
+        .eq('period', period)
+        .eq('semester_id', id);
+
+      // Insert new records
+      const { error } = await supabase
+        .from('attendance_records')
+        .insert(attendanceRecords);
+
+      if (error) throw error;
+
+      toast({
+        title: "Attendance Submitted",
+        description: `Attendance for ${semesterName} (Period ${period}) has been saved.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error saving attendance",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading attendance data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -84,7 +198,7 @@ const Attendance = () => {
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Take Attendance</h1>
           <p className="text-gray-600">
-            {semesterNames[Number(id) - 1]} - {date}
+            {semesterName} - {date}
           </p>
         </div>
 
@@ -187,20 +301,20 @@ const Attendance = () => {
                   <TableRow key={student.id}>
                     <TableCell>
                       <Checkbox
-                        checked={attendance[student.id] || false}
+                        checked={attendance[student.id.toString()] || false}
                         onCheckedChange={(checked) => 
-                          handleAttendanceChange(student.id, checked as boolean)
+                          handleAttendanceChange(student.id.toString(), checked as boolean)
                         }
                       />
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{student.roll}</Badge>
+                      <Badge variant="outline">{student.roll_number}</Badge>
                     </TableCell>
                     <TableCell className="font-medium">{student.name}</TableCell>
                     <TableCell className="text-right">
-                      {attendance[student.id] === true ? (
+                      {attendance[student.id.toString()] === true ? (
                         <Badge>Present</Badge>
-                      ) : attendance[student.id] === false ? (
+                      ) : attendance[student.id.toString()] === false ? (
                         <Badge variant="destructive">Absent</Badge>
                       ) : (
                         <Badge variant="secondary">Not Marked</Badge>

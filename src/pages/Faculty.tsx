@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,24 +10,126 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Edit, Trash2, Eye } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "@/hooks/use-toast";
+import { User } from "@/lib/db";
 
 const Faculty = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
+  const [facultyMembers, setFacultyMembers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUserRole, setCurrentUserRole] = useState("");
+  const { toast } = useToast();
 
-  // Mock faculty data
-  const facultyMembers = [
-    { id: "1", name: "Dr. John Doe", email: "john.doe@dietkolasib.edu.in", role: "admin", status: "active" },
-    { id: "2", name: "Prof. Jane Smith", email: "jane.smith@dietkolasib.edu.in", role: "faculty", status: "active" },
-    { id: "3", name: "Dr. Robert Johnson", email: "robert.j@dietkolasib.edu.in", role: "faculty", status: "active" },
-    { id: "4", name: "Ms. Emily Davis", email: "emily.d@dietkolasib.edu.in", role: "faculty", status: "inactive" },
-    { id: "5", name: "Dr. Michael Wilson", email: "michael.w@dietkolasib.edu.in", role: "faculty", status: "active" },
-    { id: "6", name: "Prof. Sarah Brown", email: "sarah.b@dietkolasib.edu.in", role: "faculty", status: "active" },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get current user role
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: userDetails } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          
+          if (userDetails) {
+            setCurrentUserRole(userDetails.role);
+          }
+        }
+        
+        // Get all faculty members
+        const { data: facultyData, error: facultyError } = await supabase
+          .from('users')
+          .select('*')
+          .order('name');
+        
+        if (facultyError) throw facultyError;
+        setFacultyMembers(facultyData || []);
+      } catch (error: any) {
+        toast({
+          title: "Error loading data",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [toast]);
 
   const handleAddFaculty = () => {
-    // In a real app, this would open a modal to add a new faculty member
-    alert("Add faculty functionality would open modal here");
+    // Only admins can add faculty
+    if (currentUserRole !== "admin") {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can add faculty members.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    toast({
+      title: "Add Faculty",
+      description: "This feature will be implemented in a future update."
+    });
+  };
+
+  const handleEditFaculty = (id: string) => {
+    // Only admins can edit faculty
+    if (currentUserRole !== "admin") {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can edit faculty members.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    toast({
+      title: "Edit Faculty",
+      description: "This feature will be implemented in a future update."
+    });
+  };
+
+  const handleDeleteFaculty = async (id: string) => {
+    // Only admins can delete faculty
+    if (currentUserRole !== "admin") {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can delete faculty members.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Remove faculty from local state
+      setFacultyMembers(facultyMembers.filter(member => member.id !== id));
+      
+      toast({
+        title: "Faculty Member Deleted",
+        description: "The faculty member has been successfully removed."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error deleting faculty member",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const filteredFaculty = facultyMembers.filter(member => {
@@ -36,6 +138,20 @@ const Faculty = () => {
     const matchesRole = selectedRole === "all" || member.role === selectedRole;
     return matchesSearch && matchesRole;
   });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading faculty data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -56,7 +172,7 @@ const Faculty = () => {
                 </CardDescription>
               </div>
               <div className="flex space-x-2 mt-2 md:mt-0">
-                <Button onClick={handleAddFaculty}>
+                <Button onClick={handleAddFaculty} disabled={currentUserRole !== "admin"}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Faculty
                 </Button>
@@ -120,10 +236,20 @@ const Faculty = () => {
                         <Button variant="outline" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleEditFaculty(member.id)}
+                          disabled={currentUserRole !== "admin"}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteFaculty(member.id)}
+                          disabled={currentUserRole !== "admin"}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
