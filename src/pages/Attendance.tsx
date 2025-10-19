@@ -191,8 +191,8 @@ const Attendance = () => {
         });
       }
 
-      // Prepare attendance records
-      const attendanceRecords = students.map(student => ({
+      // Prepare attendance records for Supabase
+      const attendanceRecordsForSupabase = students.map(student => ({
         date,
         period: currentPeriodNum,
         faculty_id: facultyId, // Always use the current faculty's ID for the new records
@@ -218,10 +218,10 @@ const Attendance = () => {
       const { error: deleteError } = await deleteQuery;
       if (deleteError) throw deleteError;
 
-      // Insert new records
+      // Insert new records into Supabase
       const { error: insertError } = await supabase
         .from('attendance_records')
-        .insert(attendanceRecords);
+        .insert(attendanceRecordsForSupabase);
 
       if (insertError) throw insertError;
 
@@ -235,6 +235,45 @@ const Attendance = () => {
         ...prev,
         [currentPeriodNum]: 'taken-by-me'
       }));
+
+      // --- NEW: Export to Google Sheets via Edge Function ---
+      const attendanceRecordsForSheets = students.map(student => ({
+        date,
+        period: currentPeriodNum,
+        studentName: student.name,
+        rollNumber: student.roll_number,
+        isPresent: attendance[student.id.toString()] ?? false,
+        semesterName: semesterName,
+      }));
+
+      const { data: exportData, error: exportError } = await supabase.functions.invoke(
+        'export-attendance-to-sheets',
+        {
+          body: JSON.stringify({ attendanceRecords: attendanceRecordsForSheets, semesterName }),
+          headers: {
+            'Content-Type': 'application/json',
+            // No Authorization header needed if the Edge Function doesn't require user auth
+          },
+        }
+      );
+
+      if (exportError) {
+        console.error("Error exporting to Google Sheets:", exportError);
+        toast({
+          title: "Export to Google Sheets Failed",
+          description: exportError.message || "An error occurred during Google Sheets export.",
+          variant: "destructive",
+          duration: 7000,
+        });
+      } else {
+        console.log("Google Sheets export successful:", exportData);
+        toast({
+          title: "Exported to Google Sheets",
+          description: "Attendance data has been sent to your Google Sheet.",
+          duration: 3000,
+        });
+      }
+      // --- END NEW: Export to Google Sheets via Edge Function ---
 
     } catch (error: any) {
       toast({
