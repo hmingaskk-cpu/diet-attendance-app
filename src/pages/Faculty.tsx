@@ -334,7 +334,8 @@ const Faculty = () => {
         isOpen={isAddFacultyDialogOpen} 
         onClose={() => {
           setIsAddFacultyDialogOpen(false);
-          form.reset(); // Reset form when closing
+          // Removed form.reset() as it was incorrectly referencing a non-existent form in this component.
+          // The AddFacultyDialog component manages its own form state internally.
         }} 
         onFacultyAdded={fetchFacultyData} 
       />
