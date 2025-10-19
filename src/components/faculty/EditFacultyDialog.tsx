@@ -20,6 +20,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 
 const editFacultyFormSchema = z.object({
@@ -34,12 +35,12 @@ const editFacultyFormSchema = z.object({
   role: z.enum(["faculty", "admin"], {
     message: "Please select a valid role.",
   }),
-  status: z.enum(["active", "inactive", "pending"], { // Added 'pending' status
+  status: z.enum(["active", "inactive", "pending"], {
     message: "Please select a valid status.",
   }),
   newPassword: z.string().min(6, {
     message: "Password must be at least 6 characters.",
-  }).optional().or(z.literal("")), // Optional password field
+  }).optional().or(z.literal("")),
 });
 
 type EditFacultyFormValues = z.infer<typeof editFacultyFormSchema>;
@@ -62,18 +63,24 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
       email: "",
       role: "faculty",
       status: "active",
-      newPassword: "", // Initialize new password field
+      newPassword: "",
     },
   });
 
   useEffect(() => {
     if (isOpen && facultyMember) {
+      const validRoles = ["faculty", "admin"];
+      const validStatuses = ["active", "inactive", "pending"];
+
+      const initialRole = validRoles.includes(facultyMember.role) ? facultyMember.role : "faculty";
+      const initialStatus = validStatuses.includes(facultyMember.status) ? facultyMember.status : "pending";
+
       form.reset({
         name: facultyMember.name,
         email: facultyMember.email,
-        role: facultyMember.role as "faculty" | "admin",
-        status: facultyMember.status as "active" | "inactive" | "pending", // Include pending
-        newPassword: "", // Always clear password field on open
+        role: initialRole as "faculty" | "admin",
+        status: initialStatus as "active" | "inactive" | "pending",
+        newPassword: "",
       });
     }
   }, [isOpen, facultyMember, form]);
@@ -112,7 +119,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
             body: JSON.stringify({ userId: facultyMember.id, newPassword: values.newPassword }),
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${user.access_token}`, // Pass current admin's token
+              'Authorization': `Bearer ${user.access_token}`,
             },
           }
         );
@@ -224,7 +231,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
                       <SelectContent>
                         <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem> {/* Added pending */}
+                        <SelectItem value="pending">Pending</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
