@@ -21,7 +21,7 @@ import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStuden
 const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const [selectedClass, setSelectedClass] = useState("all");
-  const [selectedStudent, setSelectedStudent] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(""); // This will now filter the dropdown in ComprehensiveStudentReport
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [studentReports, setStudentReports] = useState<any[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -305,7 +305,7 @@ const Reports = () => {
                 <Label htmlFor="student">Student</Label>
                 <Input
                   id="student"
-                  placeholder="Search student..."
+                  placeholder="Search student by name or roll number..."
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
                 />
@@ -405,7 +405,8 @@ const Reports = () => {
               <ComprehensiveStudentReport 
                 semesterId={parseInt(selectedClass)} 
                 startDate={dateRange.from} 
-                endDate={dateRange.to} 
+                endDate={dateRange.to}
+                filterStudentTerm={selectedStudent} // Pass the filter term
               />
             )}
           </TabsContent>

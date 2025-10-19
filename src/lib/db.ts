@@ -196,9 +196,29 @@ export const getComprehensiveStudentAttendance = async (semesterId: number, star
     .eq('semester_id', semesterId)
     .gte('date', startDate)
     .lte('date', endDate)
-    // Removed .order('student.name') as it causes a parsing error in Supabase for joined columns
     .order('date')
     .order('period');
+
+  if (error) throw error;
+  return data;
+}
+
+export const getStudentDetailedAttendance = async (studentId: number, semesterId: number, startDate: string, endDate: string) => {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select(`
+      date,
+      period,
+      is_present,
+      student:students (name, roll_number),
+      semester:semesters (name)
+    `)
+    .eq('student_id', studentId)
+    .eq('semester_id', semesterId)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: true })
+    .order('period', { ascending: true });
 
   if (error) throw error;
   return data;
