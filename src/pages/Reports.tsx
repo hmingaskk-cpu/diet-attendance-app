@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport"; // Import new component
 import DeleteAllAttendanceDialog from "@/components/reports/DeleteAllAttendanceDialog"; // Import new component
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
+import MobileBottomNavigation from "@/components/MobileBottomNavigation"; // Import MobileBottomNavigation
 
 const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
@@ -247,11 +248,12 @@ const Reports = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="p-4 md:p-6">
+        <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
         </div>
+        <MobileBottomNavigation />
       </div>
     );
   }
@@ -259,7 +261,7 @@ const Reports = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      <div className="p-4 md:p-6">
+      <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Attendance Reports</h1>
           <p className="text-gray-600">Generate and view attendance reports</p>
@@ -443,6 +445,7 @@ const Reports = () => {
           </TabsContent>
         </Tabs>
       </div>
+      <MobileBottomNavigation />
     </div>
   );
 };

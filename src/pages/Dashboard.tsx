@@ -10,6 +10,7 @@ import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
+import MobileBottomNavigation from "@/components/MobileBottomNavigation"; // Import MobileBottomNavigation
 
 const Dashboard = () => {
   const [facultyName, setFacultyName] = useState("");
@@ -107,7 +108,7 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="p-4 md:p-6">
+        <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <LoadingSkeleton count={1} height="h-32" />
@@ -123,6 +124,7 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+        <MobileBottomNavigation />
       </div>
     );
   }
@@ -130,7 +132,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      <div className="p-4 md:p-6">
+      <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Attendance Dashboard</h1>
@@ -237,6 +239,7 @@ const Dashboard = () => {
           </Card>
         </div>
       </div>
+      <MobileBottomNavigation />
     </div>
   );
 };

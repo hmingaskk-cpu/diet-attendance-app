@@ -18,6 +18,7 @@ import ImportStudentsDialog from "@/components/students/ImportStudentsDialog";
 import EditStudentDialog from "@/components/students/EditStudentDialog"; // Import new component
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
+import MobileBottomNavigation from "@/components/MobileBottomNavigation"; // Import MobileBottomNavigation
 
 const Students = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -145,11 +146,12 @@ const Students = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="p-4 md:p-6">
+        <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
         </div>
+        <MobileBottomNavigation />
       </div>
     );
   }
@@ -157,7 +159,7 @@ const Students = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      <div className="p-4 md:p-6">
+      <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Student Management</h1>
           <p className="text-gray-600">Manage student records and import/export data</p>
