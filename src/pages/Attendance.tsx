@@ -29,8 +29,8 @@ const Attendance = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [semesterName, setSemesterName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  // Change takenPeriods to store status: 'taken' or 'updated'
-  const [periodStatuses, setPeriodStatuses] = useState<Record<number, 'taken' | 'updated'>>({});
+  // Stores status for each period: 'taken-by-me', 'taken-by-other', or undefined
+  const [globalPeriodStatuses, setGlobalPeriodStatuses] = useState<Record<number, 'taken-by-me' | 'taken-by-other' | undefined>>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -78,7 +78,27 @@ const Attendance = () => {
         if (studentsError) throw studentsError;
         setStudents(studentsData || []);
         
-        // Get existing attendance records for this date and period
+        // --- New Logic: Check global attendance status for all periods today ---
+        const { data: allAttendanceToday, error: allAttendanceError } = await supabase
+          .from('attendance_records')
+          .select('period, faculty_id')
+          .eq('date', date)
+          .eq('semester_id', id);
+        
+        if (allAttendanceError) throw allAttendanceError;
+        
+        const newGlobalPeriodStatuses: Record<number, 'taken-by-me' | 'taken-by-other' | undefined> = {};
+        allAttendanceToday?.forEach(record => {
+          if (record.faculty_id === user.id) {
+            newGlobalPeriodStatuses[record.period] = 'taken-by-me';
+          } else {
+            newGlobalPeriodStatuses[record.period] = 'taken-by-other';
+          }
+        });
+        setGlobalPeriodStatuses(newGlobalPeriodStatuses);
+        // --- End New Logic ---
+
+        // Get existing attendance records for the CURRENTLY SELECTED period by THIS faculty
         const { data: attendanceData, error: attendanceError } = await supabase
           .from('attendance_records')
           .select(`
@@ -88,7 +108,7 @@ const Attendance = () => {
           .eq('date', date)
           .eq('period', period)
           .eq('semester_id', id)
-          .eq('faculty_id', user.id);
+          .eq('faculty_id', user.id); // Filter by current faculty ID
         
         if (attendanceError) throw attendanceError;
         
@@ -99,22 +119,6 @@ const Attendance = () => {
         });
         
         setAttendance(initialAttendance);
-
-        // Fetch all periods already taken for this date and semester by this faculty
-        const { data: allAttendanceToday, error: allAttendanceError } = await supabase
-          .from('attendance_records')
-          .select('period')
-          .eq('date', date)
-          .eq('semester_id', id)
-          .eq('faculty_id', user.id);
-        
-        if (allAttendanceError) throw allAttendanceError;
-        
-        const initialPeriodStatuses: Record<number, 'taken' | 'updated'> = {};
-        allAttendanceToday?.forEach(record => {
-          initialPeriodStatuses[record.period] = 'taken';
-        });
-        setPeriodStatuses(initialPeriodStatuses);
 
       } catch (error: any) {
         toast({
@@ -149,10 +153,22 @@ const Attendance = () => {
   };
 
   const handleSubmit = async () => {
-    if (!facultyName) {
+    if (!facultyId) {
       toast({
-        title: "Faculty Name Required",
-        description: "Please enter your name before submitting.",
+        title: "Authentication Error",
+        description: "Faculty ID not found. Please log in again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const currentPeriodNum = parseInt(period);
+    const status = globalPeriodStatuses[currentPeriodNum];
+
+    if (status === 'taken-by-other') {
+      toast({
+        title: "Attendance Already Taken",
+        description: `Attendance for Period ${period} on ${date} has already been submitted by another faculty member.`,
         variant: "destructive"
       });
       return;
@@ -162,21 +178,23 @@ const Attendance = () => {
       // Prepare attendance records
       const attendanceRecords = students.map(student => ({
         date,
-        period: parseInt(period),
+        period: currentPeriodNum,
         faculty_id: facultyId,
         semester_id: parseInt(id || "0"),
         student_id: student.id,
         is_present: attendance[student.id.toString()] ?? false
       }));
 
-      // Delete existing records for this date/period/semester/faculty_id
-      await supabase
-        .from('attendance_records')
-        .delete()
-        .eq('date', date)
-        .eq('period', period)
-        .eq('semester_id', id)
-        .eq('faculty_id', facultyId);
+      // Delete existing records for this date/period/semester/faculty_id (if taken by current faculty)
+      if (status === 'taken-by-me') {
+        await supabase
+          .from('attendance_records')
+          .delete()
+          .eq('date', date)
+          .eq('period', period)
+          .eq('semester_id', id)
+          .eq('faculty_id', facultyId);
+      }
 
       // Insert new records
       const { error } = await supabase
@@ -190,10 +208,10 @@ const Attendance = () => {
         description: `Attendance for ${semesterName} (Period ${period}) has been saved.`,
       });
 
-      // Update period status to 'updated' after successful submission
-      setPeriodStatuses(prev => ({
+      // Update global period status to 'taken-by-me' after successful submission
+      setGlobalPeriodStatuses(prev => ({
         ...prev,
-        [parseInt(period)]: 'updated'
+        [currentPeriodNum]: 'taken-by-me'
       }));
 
     } catch (error: any) {
@@ -204,6 +222,8 @@ const Attendance = () => {
       });
     }
   };
+
+  const isSubmitDisabled = globalPeriodStatuses[parseInt(period)] === 'taken-by-other';
 
   if (isLoading) {
     return (
@@ -249,6 +269,7 @@ const Attendance = () => {
                     value={facultyName}
                     onChange={(e) => setFacultyName(e.target.value)}
                     className="rounded-l-none"
+                    readOnly // Faculty name should ideally come from auth and not be editable here
                   />
                 </div>
               </div>
@@ -263,9 +284,12 @@ const Attendance = () => {
                       <SelectItem 
                         key={p} 
                         value={p.toString()}
-                        className={periodStatuses[p] ? "text-gray-500" : ""} // Visually distinguish, but not disable
+                        className={
+                          globalPeriodStatuses[p] === 'taken-by-me' ? "text-blue-600 font-medium" :
+                          globalPeriodStatuses[p] === 'taken-by-other' ? "text-red-600 font-medium" : ""
+                        }
                       >
-                        Period {p} {periodStatuses[p] === 'taken' ? "(Taken)" : periodStatuses[p] === 'updated' ? "(Updated)" : ""}
+                        Period {p} {globalPeriodStatuses[p] === 'taken-by-me' ? "(Taken by you)" : globalPeriodStatuses[p] === 'taken-by-other' ? "(Taken by other)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -285,6 +309,11 @@ const Attendance = () => {
                 </div>
               </div>
             </div>
+            {isSubmitDisabled && (
+              <p className="text-red-600 text-sm mt-2">
+                Attendance for Period {period} on {date} has already been submitted by another faculty member. You cannot modify it.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -301,12 +330,14 @@ const Attendance = () => {
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(true)}
+                  disabled={isSubmitDisabled}
                 >
                   Select All Present
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(false)}
+                  disabled={isSubmitDisabled}
                 >
                   Select All Absent
                 </Button>
@@ -321,6 +352,7 @@ const Attendance = () => {
                     <Checkbox
                       checked={selectAll}
                       onCheckedChange={handleSelectAll}
+                      disabled={isSubmitDisabled}
                     />
                   </TableHead>
                   <TableHead>Roll No.</TableHead>
@@ -337,6 +369,7 @@ const Attendance = () => {
                         onCheckedChange={(checked) => 
                           handleAttendanceChange(student.id.toString(), checked as boolean)
                         }
+                        disabled={isSubmitDisabled}
                       />
                     </TableCell>
                     <TableCell>
@@ -360,7 +393,7 @@ const Attendance = () => {
         </Card>
 
         <div className="mt-6 flex justify-end">
-          <Button onClick={handleSubmit} size="lg">
+          <Button onClick={handleSubmit} size="lg" disabled={isSubmitDisabled}>
             <Save className="mr-2 h-4 w-4" />
             Submit Attendance
           </Button>
