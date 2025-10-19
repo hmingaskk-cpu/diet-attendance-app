@@ -246,6 +246,9 @@ const Attendance = () => {
         semesterName: semesterName,
       }));
 
+      // Log the payload before sending
+      console.log("Payload for Edge Function:", { attendanceRecords: attendanceRecordsForSheets, semesterName });
+
       const { data: exportData, error: exportError } = await supabase.functions.invoke(
         'export-attendance-to-sheets',
         {
