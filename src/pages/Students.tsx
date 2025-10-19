@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Student, Semester } from "@/lib/db";
 import AddStudentDialog from "@/components/students/AddStudentDialog";
 import ImportStudentsDialog from "@/components/students/ImportStudentsDialog";
+import EditStudentDialog from "@/components/students/EditStudentDialog"; // Import new component
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 
 const Students = () => {
@@ -25,6 +27,8 @@ const Students = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isImportStudentsDialogOpen, setIsImportStudentsDialogOpen] = useState(false);
+  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false); // State for edit dialog
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<Student | null>(null); // State for selected student
   const { toast } = useToast();
 
   const fetchStudentsAndSemesters = async () => {
@@ -98,6 +102,11 @@ const Students = () => {
       title: "Students Exported",
       description: "Student data has been downloaded as students_data.csv.",
     });
+  };
+
+  const handleEditStudent = (student: Student) => {
+    setSelectedStudentForEdit(student);
+    setIsEditStudentDialogOpen(true);
   };
 
   const handleDeleteStudent = async (id: number) => {
@@ -231,16 +240,32 @@ const Students = () => {
                       <TableCell>{student.email || "-"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end space-x-2">
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleDeleteStudent(student.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the student 
+                                  record and any associated attendance data.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteStudent(student.id)}>Continue</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -260,6 +285,12 @@ const Students = () => {
         isOpen={isImportStudentsDialogOpen} 
         onClose={() => setIsImportStudentsDialogOpen(false)} 
         onImportComplete={fetchStudentsAndSemesters} 
+      />
+      <EditStudentDialog
+        isOpen={isEditStudentDialogOpen}
+        onClose={() => setIsEditStudentDialogOpen(false)}
+        student={selectedStudentForEdit}
+        onStudentUpdated={fetchStudentsAndSemesters}
       />
     </div>
   );
