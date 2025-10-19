@@ -32,7 +32,8 @@ const Navigation = () => {
             <Calendar className="h-6 w-6 text-blue-600" />
             <span className="font-bold text-lg">DIET Kolasib</span>
           </Link>
-          {!isMobile && ( {/* Render desktop navigation on larger screens */}
+          {/* Render desktop navigation on larger screens */}
+          {!isMobile && (
             <div className="flex items-center space-x-4">
               <Link to="/dashboard">
                 <Button variant={isActive("/dashboard") ? "default" : "ghost"} size="sm">
