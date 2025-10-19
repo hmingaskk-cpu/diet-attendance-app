@@ -13,6 +13,11 @@ import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@/lib/db";
+import AddFacultyDialog from "@/components/faculty/AddFacultyDialog";
+import EditFacultyDialog from "@/components/faculty/EditFacultyDialog";
+import ViewFacultyDialog from "@/components/faculty/ViewFacultyDialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 
 const Faculty = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,51 +25,54 @@ const Faculty = () => {
   const [facultyMembers, setFacultyMembers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState("");
+  const [isAddFacultyDialogOpen, setIsAddFacultyDialogOpen] = useState(false);
+  const [isEditFacultyDialogOpen, setIsEditFacultyDialogOpen] = useState(false);
+  const [isViewFacultyDialogOpen, setIsViewFacultyDialogOpen] = useState(false);
+  const [selectedFaculty, setSelectedFaculty] = useState<User | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Get current user role
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: userDetails } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-          
-          if (userDetails) {
-            setCurrentUserRole(userDetails.role);
-          }
-        }
-        
-        // Get all faculty members
-        const { data: facultyData, error: facultyError } = await supabase
+  const fetchFacultyData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user role
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: userDetails } = await supabase
           .from('users')
-          .select('*')
-          .order('name');
+          .select('role')
+          .eq('id', user.id)
+          .single();
         
-        if (facultyError) throw facultyError;
-        setFacultyMembers(facultyData || []);
-      } catch (error: any) {
-        toast({
-          title: "Error loading data",
-          description: error.message,
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
+        if (userDetails) {
+          setCurrentUserRole(userDetails.role);
+        }
       }
-    };
-    
-    fetchData();
+      
+      // Get all faculty members
+      const { data: facultyData, error: facultyError } = await supabase
+        .from('users')
+        .select('*')
+        .order('name');
+      
+      if (facultyError) throw facultyError;
+      setFacultyMembers(facultyData || []);
+    } catch (error: any) {
+      toast({
+        title: "Error loading data",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFacultyData();
   }, [toast]);
 
   const handleAddFaculty = () => {
-    // Only admins can add faculty
     if (currentUserRole !== "admin") {
       toast({
         title: "Access Denied",
@@ -73,15 +81,10 @@ const Faculty = () => {
       });
       return;
     }
-    
-    toast({
-      title: "Add Faculty",
-      description: "This feature will be implemented in a future update."
-    });
+    setIsAddFacultyDialogOpen(true);
   };
 
-  const handleEditFaculty = (id: string) => {
-    // Only admins can edit faculty
+  const handleEditFaculty = (member: User) => {
     if (currentUserRole !== "admin") {
       toast({
         title: "Access Denied",
@@ -90,15 +93,16 @@ const Faculty = () => {
       });
       return;
     }
-    
-    toast({
-      title: "Edit Faculty",
-      description: "This feature will be implemented in a future update."
-    });
+    setSelectedFaculty(member);
+    setIsEditFacultyDialogOpen(true);
+  };
+
+  const handleViewFaculty = (member: User) => {
+    setSelectedFaculty(member);
+    setIsViewFacultyDialogOpen(true);
   };
 
   const handleDeleteFaculty = async (id: string) => {
-    // Only admins can delete faculty
     if (currentUserRole !== "admin") {
       toast({
         title: "Access Denied",
@@ -116,8 +120,7 @@ const Faculty = () => {
       
       if (error) throw error;
       
-      // Remove faculty from local state
-      setFacultyMembers(facultyMembers.filter(member => member.id !== id));
+      fetchFacultyData(); // Refresh faculty list
       
       toast({
         title: "Faculty Member Deleted",
@@ -233,25 +236,41 @@ const Faculty = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleViewFaculty(member)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => handleEditFaculty(member.id)}
+                          onClick={() => handleEditFaculty(member)}
                           disabled={currentUserRole !== "admin"}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDeleteFaculty(member.id)}
-                          disabled={currentUserRole !== "admin"}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled={currentUserRole !== "admin"}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the faculty member 
+                                and remove their data from our servers.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteFaculty(member.id)}>Continue</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -309,6 +328,25 @@ const Faculty = () => {
           </CardContent>
         </Card>
       </div>
+      <AddFacultyDialog 
+        isOpen={isAddFacultyDialogOpen} 
+        onClose={() => {
+          setIsAddFacultyDialogOpen(false);
+          form.reset(); // Reset form when closing
+        }} 
+        onFacultyAdded={fetchFacultyData} 
+      />
+      <EditFacultyDialog 
+        isOpen={isEditFacultyDialogOpen} 
+        onClose={() => setIsEditFacultyDialogOpen(false)} 
+        facultyMember={selectedFaculty}
+        onFacultyUpdated={fetchFacultyData}
+      />
+      <ViewFacultyDialog
+        isOpen={isViewFacultyDialogOpen}
+        onClose={() => setIsViewFacultyDialogOpen(false)}
+        facultyMember={selectedFaculty}
+      />
     </div>
   );
 };
