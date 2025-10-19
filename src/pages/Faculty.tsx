@@ -17,6 +17,7 @@ import AddFacultyDialog from "@/components/faculty/AddFacultyDialog";
 import EditFacultyDialog from "@/components/faculty/EditFacultyDialog";
 import ViewFacultyDialog from "@/components/faculty/ViewFacultyDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 
 
 const Faculty = () => {
@@ -146,11 +147,10 @@ const Faculty = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading faculty data...</p>
-          </div>
+        <div className="p-4 md:p-6">
+          <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
+          <LoadingSkeleton count={1} height="h-40" className="mb-6" />
+          <LoadingSkeleton count={5} height="h-12" />
         </div>
       </div>
     );
@@ -165,7 +165,7 @@ const Faculty = () => {
           <p className="text-gray-600">Manage faculty accounts and permissions</p>
         </div>
 
-        <Card className="mb-6">
+        <Card className="shadow-sm rounded-lg">
           <CardHeader>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
@@ -282,7 +282,7 @@ const Faculty = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm rounded-lg">
           <CardHeader>
             <CardTitle>Role-Based Access Control</CardTitle>
             <CardDescription>
@@ -334,8 +334,6 @@ const Faculty = () => {
         isOpen={isAddFacultyDialogOpen} 
         onClose={() => {
           setIsAddFacultyDialogOpen(false);
-          // Removed form.reset() as it was incorrectly referencing a non-existent form in this component.
-          // The AddFacultyDialog component manages its own form state internally.
         }} 
         onFacultyAdded={fetchFacultyData} 
       />

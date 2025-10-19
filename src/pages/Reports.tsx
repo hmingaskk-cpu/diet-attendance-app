@@ -18,6 +18,7 @@ import Papa from "papaparse"; // Import PapaParse for CSV export
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
 import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport"; // Import new component
 import DeleteAllAttendanceDialog from "@/components/reports/DeleteAllAttendanceDialog"; // Import new component
+import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 
 const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
@@ -246,11 +247,10 @@ const Reports = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading report data...</p>
-          </div>
+        <div className="p-4 md:p-6">
+          <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
+          <LoadingSkeleton count={1} height="h-40" className="mb-6" />
+          <LoadingSkeleton count={5} height="h-12" />
         </div>
       </div>
     );
@@ -265,7 +265,7 @@ const Reports = () => {
           <p className="text-gray-600">Generate and view attendance reports</p>
         </div>
 
-        <Card className="mb-6">
+        <Card className="shadow-sm rounded-lg">
           <CardHeader>
             <CardTitle>Generate Report</CardTitle>
             <CardDescription>
@@ -342,7 +342,7 @@ const Reports = () => {
           </TabsList>
           <TabsContent value="daily-student-report">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <Card>
+              <Card className="shadow-sm rounded-lg">
                 <CardHeader>
                   <CardTitle>Attendance Overview</CardTitle>
                   <CardDescription>Daily attendance statistics</CardDescription>
@@ -364,7 +364,7 @@ const Reports = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="shadow-sm rounded-lg">
                 <CardHeader>
                   <CardTitle>Student Attendance</CardTitle>
                   <CardDescription>Individual student attendance percentages</CardDescription>
@@ -416,7 +416,7 @@ const Reports = () => {
           </TabsContent>
           <TabsContent value="comprehensive-student-report">
             {selectedClass === "all" ? (
-              <Card>
+              <Card className="shadow-sm rounded-lg">
                 <CardContent className="p-6 text-center text-gray-500">
                   Please select a specific class (semester) to view the comprehensive student report.
                 </CardContent>

@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
+import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 
 const Dashboard = () => {
   const [facultyName, setFacultyName] = useState("");
@@ -18,10 +19,12 @@ const Dashboard = () => {
   const [todayAttendanceCount, setTodayAttendanceCount] = useState(0);
   const [reportCount, setReportCount] = useState(0);
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true); // Add isLoading state
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        setIsLoading(true); // Set loading to true at the start
         // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -89,6 +92,8 @@ const Dashboard = () => {
           description: error.message,
           variant: "destructive"
         });
+      } finally {
+        setIsLoading(false); // Set loading to false at the end
       }
     };
     
@@ -97,6 +102,30 @@ const Dashboard = () => {
 
   // Calculate total students
   const totalStudents = Object.values(studentCounts).reduce((sum, count) => sum + count, 0);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="p-4 md:p-6">
+          <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <LoadingSkeleton count={1} height="h-32" />
+            <LoadingSkeleton count={1} height="h-32" />
+            <LoadingSkeleton count={1} height="h-32" />
+            <LoadingSkeleton count={1} height="h-32" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <LoadingSkeleton count={3} height="h-24" />
+            <div className="space-y-6">
+              <LoadingSkeleton count={1} height="h-40" />
+              <LoadingSkeleton count={1} height="h-40" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -111,7 +140,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card>
+          <Card className="shadow-sm rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Classes</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -121,7 +150,7 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Semesters</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-sm rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Students</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -131,7 +160,7 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Across all semesters</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-sm rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today's Attendance</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -141,7 +170,7 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Periods completed</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-sm rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Reports Generated</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
@@ -154,7 +183,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
+          <Card className="shadow-sm rounded-lg">
             <CardHeader>
               <CardTitle>Classes</CardTitle>
               <CardDescription>Select a class to take attendance</CardDescription>
@@ -179,7 +208,7 @@ const Dashboard = () => {
           </Card>
 
           <div className="space-y-6">
-            <Card>
+            <Card className="shadow-sm rounded-lg">
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
@@ -205,7 +234,7 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm rounded-lg">
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
               </CardHeader>

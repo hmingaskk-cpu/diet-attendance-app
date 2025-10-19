@@ -94,10 +94,10 @@ const UpdatePassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-indigo-200"> {/* Updated gradient */}
       <Navigation />
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md shadow-lg rounded-lg"> {/* Added shadow-lg and rounded-lg */}
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-gray-800">Set New Password</CardTitle>
             <CardDescription className="text-gray-600 mt-2">
@@ -150,10 +150,10 @@ const UpdatePassword = () => {
                   <Link to="/login">Back to Login</Link>
                 </Button>
               </CardFooter>
-            </form>
-          </Form>
-        </Card>
-      </div>
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
     </div>
   );
 };

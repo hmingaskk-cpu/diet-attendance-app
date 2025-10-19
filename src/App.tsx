@@ -12,11 +12,12 @@ import Students from "./pages/Students";
 import Faculty from "./pages/Faculty";
 import LoginForm from "./components/auth/LoginForm";
 import SignupForm from "./components/auth/SignupForm";
-import ForgotPassword from "./pages/ForgotPassword"; // New import
-import UpdatePassword from "./pages/UpdatePassword"; // New import
+import ForgotPassword from "./pages/ForgotPassword";
+import UpdatePassword from "./pages/UpdatePassword";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
+import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 
 const queryClient = new QueryClient();
 
@@ -44,10 +45,11 @@ const AuthenticatedApp = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading application...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="w-full max-w-md space-y-4">
+          <LoadingSkeleton count={1} height="h-10" width="w-3/4" className="mx-auto" />
+          <LoadingSkeleton count={3} height="h-8" className="w-full" />
+          <LoadingSkeleton count={1} height="h-12" width="w-1/2" className="mx-auto" />
         </div>
       </div>
     );
@@ -64,11 +66,11 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Index />} /> {/* This will now redirect to /login */}
+      <Route path="/" element={<Index />} />
       <Route path="/login" element={<LoginForm />} />
       <Route path="/signup" element={<SignupForm />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} /> {/* New route */}
-      <Route path="/update-password" element={<UpdatePassword />} /> {/* New route */}
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/update-password" element={<UpdatePassword />} />
       <Route 
         path="/dashboard" 
         element={

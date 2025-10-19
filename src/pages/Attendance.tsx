@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Student, AttendanceRecord } from "@/lib/db";
+import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 
 const Attendance = () => {
   const { id } = useParams();
@@ -249,11 +250,10 @@ const Attendance = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading attendance data...</p>
-          </div>
+        <div className="p-4 md:p-6">
+          <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
+          <LoadingSkeleton count={1} height="h-40" className="mb-6" />
+          <LoadingSkeleton count={5} height="h-12" />
         </div>
       </div>
     );
@@ -270,7 +270,7 @@ const Attendance = () => {
           </p>
         </div>
 
-        <Card className="mb-6">
+        <Card className="shadow-sm rounded-lg mb-6">
           <CardHeader>
             <CardTitle>Attendance Details</CardTitle>
             <CardDescription>
@@ -305,8 +305,8 @@ const Attendance = () => {
                         key={p} 
                         value={p.toString()}
                         className={
-                          globalPeriodStatuses[p] === 'taken-by-me' ? "text-blue-600 font-medium" :
-                          globalPeriodStatuses[p] === 'taken-by-other' ? "text-red-600 font-medium" : ""
+                          globalPeriodStatuses[p] === 'taken-by-me' ? "text-primary font-medium" : // Use primary color
+                          globalPeriodStatuses[p] === 'taken-by-other' ? "text-destructive font-medium" : "" // Use destructive color
                         }
                       >
                         Period {p} {globalPeriodStatuses[p] === 'taken-by-me' ? "(Taken by you)" : globalPeriodStatuses[p] === 'taken-by-other' ? "(Taken by other)" : ""}
@@ -330,7 +330,7 @@ const Attendance = () => {
               </div>
             </div>
             {isSubmitDisabled && (
-              <p className="text-red-600 text-sm mt-2">
+              <p className="text-destructive text-sm mt-2"> {/* Use destructive color */}
                 Attendance for Period {period} on {date} has already been submitted by another faculty member. You cannot modify it.
               </p>
             )}
@@ -342,7 +342,7 @@ const Attendance = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm rounded-lg">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>

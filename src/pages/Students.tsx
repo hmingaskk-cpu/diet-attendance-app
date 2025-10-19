@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Student, Semester } from "@/lib/db";
 import AddStudentDialog from "@/components/students/AddStudentDialog";
 import ImportStudentsDialog from "@/components/students/ImportStudentsDialog";
+import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 
 const Students = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -135,11 +136,10 @@ const Students = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading student data...</p>
-          </div>
+        <div className="p-4 md:p-6">
+          <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
+          <LoadingSkeleton count={1} height="h-40" className="mb-6" />
+          <LoadingSkeleton count={5} height="h-12" />
         </div>
       </div>
     );
@@ -154,7 +154,7 @@ const Students = () => {
           <p className="text-gray-600">Manage student records and import/export data</p>
         </div>
 
-        <Card className="mb-6">
+        <Card className="shadow-sm rounded-lg">
           <CardHeader>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>

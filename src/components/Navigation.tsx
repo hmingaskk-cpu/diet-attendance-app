@@ -24,7 +24,7 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="border-b bg-white">
+    <nav className="border-b bg-white shadow-sm"> {/* Added shadow-sm */}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {isMobile && <MobileSidebar />} {/* Render mobile sidebar on small screens */}
@@ -36,25 +36,25 @@ const Navigation = () => {
           {!isMobile && (
             <div className="flex items-center space-x-4">
               <Link to="/dashboard">
-                <Button variant={isActive("/dashboard") ? "default" : "ghost"} size="sm">
+                <Button variant={isActive("/dashboard") ? "default" : "ghost"} size="sm" className={isActive("/dashboard") ? "bg-primary text-primary-foreground" : ""}>
                   <Home className="mr-2 h-4 w-4" />
                   Dashboard
                 </Button>
               </Link>
               <Link to="/reports">
-                <Button variant={isActive("/reports") ? "default" : "ghost"} size="sm">
+                <Button variant={isActive("/reports") ? "default" : "ghost"} size="sm" className={isActive("/reports") ? "bg-primary text-primary-foreground" : ""}>
                   <BarChart3 className="mr-2 h-4 w-4" />
                   Reports
                 </Button>
               </Link>
               <Link to="/students">
-                <Button variant={isActive("/students") ? "default" : "ghost"} size="sm">
+                <Button variant={isActive("/students") ? "default" : "ghost"} size="sm" className={isActive("/students") ? "bg-primary text-primary-foreground" : ""}>
                   <Users className="mr-2 h-4 w-4" />
                   Students
                 </Button>
               </Link>
               <Link to="/faculty">
-                <Button variant={isActive("/faculty") ? "default" : "ghost"} size="sm">
+                <Button variant={isActive("/faculty") ? "default" : "ghost"} size="sm" className={isActive("/faculty") ? "bg-primary text-primary-foreground" : ""}>
                   <User className="mr-2 h-4 w-4" />
                   Faculty
                 </Button>
