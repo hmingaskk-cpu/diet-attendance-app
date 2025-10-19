@@ -29,7 +29,8 @@ const Attendance = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [semesterName, setSemesterName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [takenPeriods, setTakenPeriods] = useState<number[]>([]); // New state for taken periods
+  // Change takenPeriods to store status: 'taken' or 'updated'
+  const [periodStatuses, setPeriodStatuses] = useState<Record<number, 'taken' | 'updated'>>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,7 +88,7 @@ const Attendance = () => {
           .eq('date', date)
           .eq('period', period)
           .eq('semester_id', id)
-          .eq('faculty_id', user.id); // Ensure we only fetch records submitted by this faculty
+          .eq('faculty_id', user.id);
         
         if (attendanceError) throw attendanceError;
         
@@ -109,8 +110,11 @@ const Attendance = () => {
         
         if (allAttendanceError) throw allAttendanceError;
         
-        const uniquePeriods = [...new Set(allAttendanceToday?.map(record => record.period))];
-        setTakenPeriods(uniquePeriods);
+        const initialPeriodStatuses: Record<number, 'taken' | 'updated'> = {};
+        allAttendanceToday?.forEach(record => {
+          initialPeriodStatuses[record.period] = 'taken';
+        });
+        setPeriodStatuses(initialPeriodStatuses);
 
       } catch (error: any) {
         toast({
@@ -166,14 +170,13 @@ const Attendance = () => {
       }));
 
       // Delete existing records for this date/period/semester/faculty_id
-      // This ensures a faculty member only updates their own submitted records
       await supabase
         .from('attendance_records')
         .delete()
         .eq('date', date)
         .eq('period', period)
         .eq('semester_id', id)
-        .eq('faculty_id', facultyId); // Crucial addition for faculty-specific updates
+        .eq('faculty_id', facultyId);
 
       // Insert new records
       const { error } = await supabase
@@ -187,8 +190,11 @@ const Attendance = () => {
         description: `Attendance for ${semesterName} (Period ${period}) has been saved.`,
       });
 
-      // Update taken periods after successful submission
-      setTakenPeriods(prev => [...new Set([...prev, parseInt(period)])]);
+      // Update period status to 'updated' after successful submission
+      setPeriodStatuses(prev => ({
+        ...prev,
+        [parseInt(period)]: 'updated'
+      }));
 
     } catch (error: any) {
       toast({
@@ -257,10 +263,9 @@ const Attendance = () => {
                       <SelectItem 
                         key={p} 
                         value={p.toString()}
-                        disabled={takenPeriods.includes(p) && p.toString() !== period} // Disable if taken and not current
-                        className={takenPeriods.includes(p) && p.toString() !== period ? "text-gray-400" : ""}
+                        className={periodStatuses[p] ? "text-gray-500" : ""} // Visually distinguish, but not disable
                       >
-                        Period {p} {takenPeriods.includes(p) ? "(Taken)" : ""}
+                        Period {p} {periodStatuses[p] === 'taken' ? "(Taken)" : periodStatuses[p] === 'updated' ? "(Updated)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
