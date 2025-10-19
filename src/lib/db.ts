@@ -143,6 +143,15 @@ export const updateAttendanceRecord = async (id: number, record: Partial<Attenda
   return data
 }
 
+export const deleteAllAttendanceRecords = async () => {
+  const { error } = await supabase
+    .from('attendance_records')
+    .delete()
+    .neq('id', 0); // Delete all records where id is not 0 (i.e., all records)
+  
+  if (error) throw error;
+}
+
 // Report operations
 export const getAttendanceReport = async (startDate: string, endDate: string, semesterId?: number) => {
   let query = supabase

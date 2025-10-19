@@ -17,6 +17,7 @@ import { Semester, Student } from "@/lib/db";
 import Papa from "papaparse"; // Import PapaParse for CSV export
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
 import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport"; // Import new component
+import DeleteAllAttendanceDialog from "@/components/reports/DeleteAllAttendanceDialog"; // Import new component
 
 const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
@@ -27,52 +28,66 @@ const Reports = () => {
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUserRole, setCurrentUserRole] = useState(""); // State to store current user's role
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Get semesters
-        const { data: semestersData, error: semestersError } = await supabase
-          .from('semesters')
-          .select('*')
-          .order('id');
-        
-        if (semestersError) throw semestersError;
-        setSemesters(semestersData || []);
-        
-        // Get students
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('students')
-          .select('*')
-          .order('name');
-        
-        if (studentsError) throw studentsError;
-        setStudents(studentsData || []);
-        
-        // Set default date range to last 30 days
-        const today = new Date();
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        
-        setDateRange({
-          from: thirtyDaysAgo.toISOString().split('T')[0],
-          to: today.toISOString().split('T')[0]
-        });
-      } catch (error: any) {
-        toast({
-          title: "Error loading data",
-          description: error.message,
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
+  const fetchInitialData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user role
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: userDetails } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (userDetails) {
+          setCurrentUserRole(userDetails.role);
+        }
       }
-    };
-    
-    fetchData();
+
+      // Get semesters
+      const { data: semestersData, error: semestersError } = await supabase
+        .from('semesters')
+        .select('*')
+        .order('id');
+      
+      if (semestersError) throw semestersError;
+      setSemesters(semestersData || []);
+      
+      // Get students
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select('*')
+        .order('name');
+      
+      if (studentsError) throw studentsError;
+      setStudents(studentsData || []);
+      
+      // Set default date range to last 30 days
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      
+      setDateRange({
+        from: thirtyDaysAgo.toISOString().split('T')[0],
+        to: today.toISOString().split('T')[0]
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error loading data",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialData();
   }, [toast]);
 
   useEffect(() => {
@@ -387,7 +402,10 @@ const Reports = () => {
               </Card>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end space-x-2">
+              {currentUserRole === "admin" && (
+                <DeleteAllAttendanceDialog onDeleteComplete={fetchInitialData} />
+              )}
               <Button onClick={handleDownload}>
                 <Download className="mr-2 h-4 w-4" />
                 Download Report
