@@ -337,8 +337,19 @@ const Reports = () => {
 
         <Tabs defaultValue="daily-student-report" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="daily-student-report">Daily & Student Attendance</TabsTrigger>
-            <TabsTrigger value="comprehensive-student-report" disabled={selectedClass === "all"}>Comprehensive Student Report</TabsTrigger>
+            <TabsTrigger 
+              value="daily-student-report" 
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              DAR
+            </TabsTrigger>
+            <TabsTrigger 
+              value="comprehensive-student-report" 
+              disabled={selectedClass === "all"}
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              CSR
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="daily-student-report">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
