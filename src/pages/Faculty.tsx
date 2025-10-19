@@ -164,14 +164,14 @@ const Faculty = () => {
 
         <Card className="mb-6">
           <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Faculty Members</CardTitle>
                 <CardDescription>
                   View and manage faculty accounts
                 </CardDescription>
               </div>
-              <div className="flex space-x-2 mt-2 md:mt-0">
+              <div className="flex space-x-2">
                 <Button onClick={handleAddFaculty} disabled={currentUserRole !== "admin"}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Faculty
@@ -206,60 +206,58 @@ const Faculty = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto"> {/* Added for horizontal scrolling on mobile */}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredFaculty.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell className="font-medium">{member.name}</TableCell>
+                    <TableCell>{member.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={member.role === "admin" ? "default" : "secondary"}>
+                        {member.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={member.status === "active" ? "default" : "destructive"}>
+                        {member.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleEditFaculty(member.id)}
+                          disabled={currentUserRole !== "admin"}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteFaculty(member.id)}
+                          disabled={currentUserRole !== "admin"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredFaculty.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="font-medium">{member.name}</TableCell>
-                      <TableCell>{member.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={member.role === "admin" ? "default" : "secondary"}>
-                          {member.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={member.status === "active" ? "default" : "destructive"}>
-                          {member.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleEditFaculty(member.id)}
-                            disabled={currentUserRole !== "admin"}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleDeleteFaculty(member.id)}
-                            disabled={currentUserRole !== "admin"}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 

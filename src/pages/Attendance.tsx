@@ -285,25 +285,23 @@ const Attendance = () => {
 
         <Card>
           <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Student List</CardTitle>
                 <CardDescription>
                   Mark attendance for each student
                 </CardDescription>
               </div>
-              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 mt-2 md:mt-0"> {/* Added flex-col and space-y for mobile */}
+              <div className="flex space-x-2">
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(true)}
-                  className="w-full md:w-auto" {/* Added w-full for mobile */}
                 >
                   Select All Present
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(false)}
-                  className="w-full md:w-auto" {/* Added w-full for mobile */}
                 >
                   Select All Absent
                 </Button>
@@ -311,55 +309,53 @@ const Attendance = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto"> {/* Added for horizontal scrolling on mobile */}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectAll}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead>Roll No.</TableHead>
+                  <TableHead>Student Name</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell>
                       <Checkbox
-                        checked={selectAll}
-                        onCheckedChange={handleSelectAll}
+                        checked={attendance[student.id.toString()] || false}
+                        onCheckedChange={(checked) => 
+                          handleAttendanceChange(student.id.toString(), checked as boolean)
+                        }
                       />
-                    </TableHead>
-                    <TableHead>Roll No.</TableHead>
-                    <TableHead>Student Name</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{student.roll_number}</Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{student.name}</TableCell>
+                    <TableCell className="text-right">
+                      {attendance[student.id.toString()] === true ? (
+                        <Badge>Present</Badge>
+                      ) : attendance[student.id.toString()] === false ? (
+                        <Badge variant="destructive">Absent</Badge>
+                      ) : (
+                        <Badge variant="secondary">Not Marked</Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={attendance[student.id.toString()] || false}
-                          onCheckedChange={(checked) => 
-                            handleAttendanceChange(student.id.toString(), checked as boolean)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{student.roll_number}</Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell className="text-right">
-                        {attendance[student.id.toString()] === true ? (
-                          <Badge>Present</Badge>
-                        ) : attendance[student.id.toString()] === false ? (
-                          <Badge variant="destructive">Absent</Badge>
-                        ) : (
-                          <Badge variant="secondary">Not Marked</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 
         <div className="mt-6 flex justify-end">
-          <Button onClick={handleSubmit} size="lg" className="w-full md:w-auto"> {/* Added w-full for mobile */}
+          <Button onClick={handleSubmit} size="lg">
             <Save className="mr-2 h-4 w-4" />
             Submit Attendance
           </Button>

@@ -156,23 +156,23 @@ const Students = () => {
 
         <Card className="mb-6">
           <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Student Records</CardTitle>
                 <CardDescription>
                   View and manage student information
                 </CardDescription>
               </div>
-              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 mt-2 md:mt-0"> {/* Added flex-col and space-y for mobile */}
-                <Button onClick={() => setIsImportStudentsDialogOpen(true)} variant="outline" className="w-full md:w-auto"> {/* Added w-full for mobile */}
+              <div className="flex space-x-2">
+                <Button onClick={() => setIsImportStudentsDialogOpen(true)} variant="outline">
                   <Upload className="mr-2 h-4 w-4" />
                   Import
                 </Button>
-                <Button onClick={handleExport} variant="outline" className="w-full md:w-auto"> {/* Added w-full for mobile */}
+                <Button onClick={handleExport} variant="outline">
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
-                <Button onClick={() => setIsAddStudentDialogOpen(true)} className="w-full md:w-auto"> {/* Added w-full for mobile */}
+                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Student
                 </Button>
@@ -209,45 +209,43 @@ const Students = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto"> {/* Added for horizontal scrolling on mobile */}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Roll No.</TableHead>
-                    <TableHead>Student Name</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Roll No.</TableHead>
+                  <TableHead>Student Name</TableHead>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell>
+                      <Badge variant="outline">{student.roll_number}</Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{student.name}</TableCell>
+                    <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
+                    <TableCell>{student.email || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteStudent(student.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredStudents.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell>
-                        <Badge variant="outline">{student.roll_number}</Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
-                      <TableCell>{student.email || "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleDeleteStudent(student.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
