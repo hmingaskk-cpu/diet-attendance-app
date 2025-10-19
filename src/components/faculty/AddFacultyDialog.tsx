@@ -78,13 +78,12 @@ const AddFacultyDialog = ({ isOpen, onClose, onFacultyAdded }: AddFacultyDialogP
 
       if (authError) throw authError;
 
-      // If signup is successful, the handle_new_user trigger should insert into public.users
-      // We can optionally verify this or add a direct insert if the trigger isn't reliable
-      // For now, we'll assume the trigger works as expected.
-
+      // If signup is successful, the handle_new_user trigger will insert into public.users
+      // with a 'pending' status.
       toast({
         title: "Faculty Member Added",
-        description: `${values.name} has been added successfully. An email confirmation has been sent.`,
+        description: `${values.name} has been added successfully with 'pending' status. An email confirmation has been sent. An administrator must activate the account.`,
+        duration: 7000,
       });
       onFacultyAdded();
       onClose();
@@ -105,7 +104,7 @@ const AddFacultyDialog = ({ isOpen, onClose, onFacultyAdded }: AddFacultyDialogP
         <DialogHeader>
           <DialogTitle>Add New Faculty Member</DialogTitle>
           <DialogDescription>
-            Enter the details for the new faculty member.
+            Enter the details for the new faculty member. Their account will be created with a 'pending' status and require admin activation.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

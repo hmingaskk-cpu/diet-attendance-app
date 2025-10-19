@@ -81,13 +81,14 @@ const SignupForm = () => {
     } else {
       toast({
         title: "Account Created",
-        description: "Please check your email to confirm your account.",
+        description: "Your account is pending admin approval. You will be able to log in once approved.",
+        duration: 5000, // Give user more time to read this important message
       });
       
       // Redirect to login page after a short delay
       setTimeout(() => {
         navigate("/login");
-      }, 2000);
+      }, 3000); // Increased delay for better UX
     }
     
     setIsLoading(false);

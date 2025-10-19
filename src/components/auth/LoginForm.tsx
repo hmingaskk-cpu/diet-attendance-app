@@ -51,7 +51,7 @@ const LoginForm = () => {
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
     
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: values.email,
       password: values.password,
     });
@@ -62,14 +62,46 @@ const LoginForm = () => {
         description: error.message,
         variant: "destructive"
       });
-    } else {
-      toast({
-        title: "Login Successful",
-        description: "Redirecting to dashboard...",
-      });
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 1000);
+    } else if (data.user) {
+      // Check user status in public.users table
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('status')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        toast({
+          title: "Login Failed",
+          description: profileError.message,
+          variant: "destructive"
+        });
+        await supabase.auth.signOut(); // Log out the user from auth session
+      } else if (userProfile?.status === 'pending') {
+        toast({
+          title: "Account Pending Approval",
+          description: "Your account is awaiting administrator approval. Please try again later.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        await supabase.auth.signOut(); // Log out the user from auth session
+      } else if (userProfile?.status === 'inactive') {
+        toast({
+          title: "Account Inactive",
+          description: "Your account has been deactivated. Please contact an administrator.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        await supabase.auth.signOut(); // Log out the user from auth session
+      } else {
+        toast({
+          title: "Login Successful",
+          description: "Redirecting to dashboard...",
+        });
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1000);
+      }
     }
     
     setIsLoading(false);
