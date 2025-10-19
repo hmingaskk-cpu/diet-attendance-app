@@ -29,6 +29,7 @@ const Attendance = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [semesterName, setSemesterName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUserRole, setCurrentUserRole] = useState(""); // New state for current user's role
   // Stores status for each period: 'taken-by-me', 'taken-by-other', or undefined
   const [globalPeriodStatuses, setGlobalPeriodStatuses] = useState<Record<number, 'taken-by-me' | 'taken-by-other' | undefined>>({});
 
@@ -46,27 +47,27 @@ const Attendance = () => {
         
         setFacultyId(user.id);
         
-        // Get user details
-        const { data: userDetails } = await supabase
+        // Get user details and role
+        const { data: userDetails, error: userDetailsError } = await supabase
           .from('users')
-          .select('name')
+          .select('name, role')
           .eq('id', user.id)
           .single();
         
-        if (userDetails) {
-          setFacultyName(userDetails.name);
-        }
+        if (userDetailsError) throw userDetailsError;
+        
+        setFacultyName(userDetails?.name || "Faculty");
+        setCurrentUserRole(userDetails?.role || ""); // Set the current user's role
         
         // Get semester details
-        const { data: semesterData } = await supabase
+        const { data: semesterData, error: semesterError } = await supabase
           .from('semesters')
           .select('name')
           .eq('id', id)
           .single();
         
-        if (semesterData) {
-          setSemesterName(semesterData.name);
-        }
+        if (semesterError) throw semesterError;
+        setSemesterName(semesterData?.name || "");
         
         // Get students for this semester
         const { data: studentsData, error: studentsError } = await supabase
@@ -99,6 +100,7 @@ const Attendance = () => {
         // --- End New Logic ---
 
         // Get existing attendance records for the CURRENTLY SELECTED period by THIS faculty
+        // Admins can see all records, but only their own are pre-filled for editing
         const { data: attendanceData, error: attendanceError } = await supabase
           .from('attendance_records')
           .select(`
@@ -108,7 +110,7 @@ const Attendance = () => {
           .eq('date', date)
           .eq('period', period)
           .eq('semester_id', id)
-          .eq('faculty_id', user.id); // Filter by current faculty ID
+          .eq('faculty_id', user.id); // Filter by current faculty ID to pre-fill only their own records
         
         if (attendanceError) throw attendanceError;
         
@@ -165,43 +167,60 @@ const Attendance = () => {
     const currentPeriodNum = parseInt(period);
     const status = globalPeriodStatuses[currentPeriodNum];
 
-    if (status === 'taken-by-other') {
+    // If attendance is taken by another faculty and current user is NOT admin, prevent submission
+    if (status === 'taken-by-other' && currentUserRole !== 'admin') {
       toast({
         title: "Attendance Already Taken",
-        description: `Attendance for Period ${period} on ${date} has already been submitted by another faculty member.`,
+        description: `Attendance for Period ${period} on ${date} has already been submitted by another faculty member. You cannot modify it.`,
         variant: "destructive"
       });
       return;
     }
 
     try {
+      // If attendance was taken by another faculty and current user IS admin, warn them
+      if (status === 'taken-by-other' && currentUserRole === 'admin') {
+        toast({
+          title: "Overwriting Attendance",
+          description: `You are overwriting attendance for Period ${period} on ${date} previously submitted by another faculty.`,
+          variant: "warning",
+          duration: 5000,
+        });
+      }
+
       // Prepare attendance records
       const attendanceRecords = students.map(student => ({
         date,
         period: currentPeriodNum,
-        faculty_id: facultyId,
+        faculty_id: facultyId, // Always use the current faculty's ID for the new records
         semester_id: parseInt(id || "0"),
         student_id: student.id,
         is_present: attendance[student.id.toString()] ?? false
       }));
 
-      // Delete existing records for this date/period/semester/faculty_id (if taken by current faculty)
-      if (status === 'taken-by-me') {
-        await supabase
-          .from('attendance_records')
-          .delete()
-          .eq('date', date)
-          .eq('period', period)
-          .eq('semester_id', id)
-          .eq('faculty_id', facultyId);
+      // Delete existing records for this date/period/semester
+      // If admin, delete ALL records for this period/date/semester.
+      // If faculty, delete only their OWN records for this period/date/semester (if they had taken it).
+      let deleteQuery = supabase
+        .from('attendance_records')
+        .delete()
+        .eq('date', date)
+        .eq('period', period)
+        .eq('semester_id', id);
+      
+      if (currentUserRole !== 'admin') {
+        deleteQuery = deleteQuery.eq('faculty_id', facultyId);
       }
 
+      const { error: deleteError } = await deleteQuery;
+      if (deleteError) throw deleteError;
+
       // Insert new records
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('attendance_records')
         .insert(attendanceRecords);
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
       toast({
         title: "Attendance Submitted",
@@ -223,7 +242,8 @@ const Attendance = () => {
     }
   };
 
-  const isSubmitDisabled = globalPeriodStatuses[parseInt(period)] === 'taken-by-other';
+  // Disable submission only if it's taken by another faculty AND the current user is NOT an admin
+  const isSubmitDisabled = globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole !== 'admin';
 
   if (isLoading) {
     return (
@@ -312,6 +332,11 @@ const Attendance = () => {
             {isSubmitDisabled && (
               <p className="text-red-600 text-sm mt-2">
                 Attendance for Period {period} on {date} has already been submitted by another faculty member. You cannot modify it.
+              </p>
+            )}
+            {globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole === 'admin' && (
+              <p className="text-orange-600 text-sm mt-2">
+                As an admin, you can overwrite this attendance record. Submitting will replace the existing data.
               </p>
             )}
           </CardContent>
