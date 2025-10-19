@@ -139,7 +139,62 @@ const Dashboard = () => {
           <Badge variant="secondary">{role}</Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Classes Card - Moved to top-left */}
+          <Card className="shadow-sm rounded-lg">
+            <CardHeader>
+              <CardTitle>Classes</CardTitle>
+              <CardDescription>Select a class to take attendance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {semesters.map((semester) => (
+                  <Link to={`/attendance/${semester.id}`} key={semester.id}>
+                    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                      <div>
+                        <h3 className="font-medium">{semester.name}</h3>
+                        <p className="text-sm text-gray-500">{studentCounts[semester.id] || 0} students</p>
+                      </div>
+                      <Button variant="outline">
+                        Take Attendance
+                      </Button>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions Card - Moved to top-right */}
+          <Card className="shadow-sm rounded-lg">
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Link to="/reports">
+                <Button variant="outline" className="w-full justify-start">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Generate Reports
+                </Button>
+              </Link>
+              <Link to="/students">
+                <Button variant="outline" className="w-full justify-start">
+                  <Users className="mr-2 h-4 w-4" />
+                  Manage Students
+                </Button>
+              </Link>
+              <Link to="/faculty">
+                <Button variant="outline" className="w-full justify-start">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Faculty Management
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Summary/Report Cards - Moved to bottom */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="shadow-sm rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Classes</CardTitle>
@@ -180,88 +235,6 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">This month</p>
             </CardContent>
           </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="shadow-sm rounded-lg">
-            <CardHeader>
-              <CardTitle>Classes</CardTitle>
-              <CardDescription>Select a class to take attendance</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {semesters.map((semester) => (
-                  <Link to={`/attendance/${semester.id}`} key={semester.id}>
-                    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                      <div>
-                        <h3 className="font-medium">{semester.name}</h3>
-                        <p className="text-sm text-gray-500">{studentCounts[semester.id] || 0} students</p>
-                      </div>
-                      <Button variant="outline">
-                        Take Attendance
-                      </Button>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-6">
-            <Card className="shadow-sm rounded-lg">
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Link to="/reports">
-                  <Button variant="outline" className="w-full justify-start">
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Generate Reports
-                  </Button>
-                </Link>
-                <Link to="/students">
-                  <Button variant="outline" className="w-full justify-start">
-                    <Users className="mr-2 h-4 w-4" />
-                    Manage Students
-                  </Button>
-                </Link>
-                <Link to="/faculty">
-                  <Button variant="outline" className="w-full justify-start">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Faculty Management
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm rounded-lg">
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start">
-                    <div className="bg-blue-100 p-2 rounded-full mr-3">
-                      <Calendar className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Attendance taken for 3rd Semester</p>
-                      <p className="text-xs text-gray-500">Today, 10:30 AM</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="bg-green-100 p-2 rounded-full mr-3">
-                      <FileText className="h-4 w-4 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Student data imported</p>
-                      <p className="text-xs text-gray-500">Yesterday, 2:15 PM</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
     </div>
