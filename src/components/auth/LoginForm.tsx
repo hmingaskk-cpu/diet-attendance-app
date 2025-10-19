@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,7 +80,6 @@ const LoginForm = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-gray-800">DIET Kolasib Attendance System</CardTitle>
-          <img src="/LogoDIET.png" alt="DIET Kolasib Logo" className="mx-auto mt-4 mb-4 h-24" />
           <CardDescription className="text-lg text-gray-600 mt-2">
             Sign in to manage student attendance
           </CardDescription>
