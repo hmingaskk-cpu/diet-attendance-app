@@ -196,7 +196,7 @@ export const getComprehensiveStudentAttendance = async (semesterId: number, star
     .eq('semester_id', semesterId)
     .gte('date', startDate)
     .lte('date', endDate)
-    .order('student.name')
+    // Removed .order('student.name') as it causes a parsing error in Supabase for joined columns
     .order('date')
     .order('period');
 
