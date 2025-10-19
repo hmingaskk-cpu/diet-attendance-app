@@ -236,48 +236,6 @@ const Attendance = () => {
         [currentPeriodNum]: 'taken-by-me'
       }));
 
-      // --- NEW: Export to Google Sheets via Edge Function ---
-      const attendanceRecordsForSheets = students.map(student => ({
-        date,
-        period: currentPeriodNum,
-        studentName: student.name,
-        rollNumber: student.roll_number,
-        isPresent: attendance[student.id.toString()] ?? false,
-        semesterName: semesterName,
-      }));
-
-      // Log the payload before sending
-      console.log("Payload for Edge Function:", { attendanceRecords: attendanceRecordsForSheets, semesterName });
-
-      const { data: exportData, error: exportError } = await supabase.functions.invoke(
-        'export-attendance-to-sheets',
-        {
-          body: JSON.stringify({ attendanceRecords: attendanceRecordsForSheets, semesterName }),
-          headers: {
-            'Content-Type': 'application/json',
-            // No Authorization header needed if the Edge Function doesn't require user auth
-          },
-        }
-      );
-
-      if (exportError) {
-        console.error("Error exporting to Google Sheets:", exportError);
-        toast({
-          title: "Export to Google Sheets Failed",
-          description: exportError.message || "An error occurred during Google Sheets export.",
-          variant: "destructive",
-          duration: 7000,
-        });
-      } else {
-        console.log("Google Sheets export successful:", exportData);
-        toast({
-          title: "Exported to Google Sheets",
-          description: "Attendance data has been sent to your Google Sheet.",
-          duration: 3000,
-        });
-      }
-      // --- END NEW: Export to Google Sheets via Edge Function ---
-
     } catch (error: any) {
       toast({
         title: "Error saving attendance",
