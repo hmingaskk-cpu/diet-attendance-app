@@ -16,6 +16,7 @@ import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Student, AttendanceRecord } from "@/lib/db";
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog
 
 const Attendance = () => {
   const { id } = useParams();
@@ -344,14 +345,14 @@ const Attendance = () => {
 
         <Card className="shadow-sm rounded-lg">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"> {/* Added flex-col and gap-4 for responsiveness */}
               <div>
                 <CardTitle>Student List</CardTitle>
                 <CardDescription>
                   Mark attendance for each student
                 </CardDescription>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2"> {/* Changed to flex-wrap gap-2 */}
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(true)}
@@ -418,10 +419,31 @@ const Attendance = () => {
         </Card>
 
         <div className="mt-6 flex justify-end">
-          <Button onClick={handleSubmit} size="lg" disabled={isSubmitDisabled}>
-            <Save className="mr-2 h-4 w-4" />
-            Submit Attendance
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="lg" disabled={isSubmitDisabled}>
+                <Save className="mr-2 h-4 w-4" />
+                Submit Attendance
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Attendance Submission</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to submit attendance for Period {period} on {date}?
+                  {globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole === 'admin' && (
+                    <p className="text-orange-600 mt-2">
+                      As an admin, this action will overwrite existing attendance data for this period.
+                    </p>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleSubmit}>Confirm Submit</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </div>
