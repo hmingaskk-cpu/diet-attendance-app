@@ -29,6 +29,7 @@ const Attendance = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [semesterName, setSemesterName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [takenPeriods, setTakenPeriods] = useState<number[]>([]); // New state for taken periods
 
   useEffect(() => {
     const fetchData = async () => {
@@ -97,6 +98,20 @@ const Attendance = () => {
         });
         
         setAttendance(initialAttendance);
+
+        // Fetch all periods already taken for this date and semester by this faculty
+        const { data: allAttendanceToday, error: allAttendanceError } = await supabase
+          .from('attendance_records')
+          .select('period')
+          .eq('date', date)
+          .eq('semester_id', id)
+          .eq('faculty_id', user.id);
+        
+        if (allAttendanceError) throw allAttendanceError;
+        
+        const uniquePeriods = [...new Set(allAttendanceToday?.map(record => record.period))];
+        setTakenPeriods(uniquePeriods);
+
       } catch (error: any) {
         toast({
           title: "Error loading data",
@@ -171,6 +186,10 @@ const Attendance = () => {
         title: "Attendance Submitted",
         description: `Attendance for ${semesterName} (Period ${period}) has been saved.`,
       });
+
+      // Update taken periods after successful submission
+      setTakenPeriods(prev => [...new Set([...prev, parseInt(period)])]);
+
     } catch (error: any) {
       toast({
         title: "Error saving attendance",
@@ -235,8 +254,13 @@ const Attendance = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {[1, 2, 3, 4, 5, 6].map((p) => (
-                      <SelectItem key={p} value={p.toString()}>
-                        Period {p}
+                      <SelectItem 
+                        key={p} 
+                        value={p.toString()}
+                        disabled={takenPeriods.includes(p) && p.toString() !== period} // Disable if taken and not current
+                        className={takenPeriods.includes(p) && p.toString() !== period ? "text-gray-400" : ""}
+                      >
+                        Period {p} {takenPeriods.includes(p) ? "(Taken)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -268,16 +292,18 @@ const Attendance = () => {
                   Mark attendance for each student
                 </CardDescription>
               </div>
-              <div className="flex space-x-2 mt-2 md:mt-0">
+              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 mt-2 md:mt-0"> {/* Added flex-col and space-y for mobile */}
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(true)}
+                  className="w-full md:w-auto" {/* Added w-full for mobile */}
                 >
                   Select All Present
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(false)}
+                  className="w-full md:w-auto" {/* Added w-full for mobile */}
                 >
                   Select All Absent
                 </Button>
@@ -285,53 +311,55 @@ const Attendance = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectAll}
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead>Roll No.</TableHead>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
+            <div className="overflow-x-auto"> {/* Added for horizontal scrolling on mobile */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
                       <Checkbox
-                        checked={attendance[student.id.toString()] || false}
-                        onCheckedChange={(checked) => 
-                          handleAttendanceChange(student.id.toString(), checked as boolean)
-                        }
+                        checked={selectAll}
+                        onCheckedChange={handleSelectAll}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{student.roll_number}</Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell className="text-right">
-                      {attendance[student.id.toString()] === true ? (
-                        <Badge>Present</Badge>
-                      ) : attendance[student.id.toString()] === false ? (
-                        <Badge variant="destructive">Absent</Badge>
-                      ) : (
-                        <Badge variant="secondary">Not Marked</Badge>
-                      )}
-                    </TableCell>
+                    </TableHead>
+                    <TableHead>Roll No.</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {students.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={attendance[student.id.toString()] || false}
+                          onCheckedChange={(checked) => 
+                            handleAttendanceChange(student.id.toString(), checked as boolean)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{student.roll_number}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell className="text-right">
+                        {attendance[student.id.toString()] === true ? (
+                          <Badge>Present</Badge>
+                        ) : attendance[student.id.toString()] === false ? (
+                          <Badge variant="destructive">Absent</Badge>
+                        ) : (
+                          <Badge variant="secondary">Not Marked</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
         <div className="mt-6 flex justify-end">
-          <Button onClick={handleSubmit} size="lg">
+          <Button onClick={handleSubmit} size="lg" className="w-full md:w-auto"> {/* Added w-full for mobile */}
             <Save className="mr-2 h-4 w-4" />
             Submit Attendance
           </Button>

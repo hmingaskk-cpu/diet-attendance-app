@@ -163,16 +163,16 @@ const Students = () => {
                   View and manage student information
                 </CardDescription>
               </div>
-              <div className="flex space-x-2 mt-2 md:mt-0">
-                <Button onClick={() => setIsImportStudentsDialogOpen(true)} variant="outline">
+              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 mt-2 md:mt-0"> {/* Added flex-col and space-y for mobile */}
+                <Button onClick={() => setIsImportStudentsDialogOpen(true)} variant="outline" className="w-full md:w-auto"> {/* Added w-full for mobile */}
                   <Upload className="mr-2 h-4 w-4" />
                   Import
                 </Button>
-                <Button onClick={handleExport} variant="outline">
+                <Button onClick={handleExport} variant="outline" className="w-full md:w-auto"> {/* Added w-full for mobile */}
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
-                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
+                <Button onClick={() => setIsAddStudentDialogOpen(true)} className="w-full md:w-auto"> {/* Added w-full for mobile */}
                   <Plus className="mr-2 h-4 w-4" />
                   Add Student
                 </Button>
@@ -209,70 +209,47 @@ const Students = () => {
               </div>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Roll No.</TableHead>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <Badge variant="outline">{student.roll_number}</Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
-                    <TableCell>{student.email || "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDeleteStudent(student.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto"> {/* Added for horizontal scrolling on mobile */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Roll No.</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* The old import card is replaced by the dialog */}
-        {/* <Card>
-          <CardHeader>
-            <CardTitle>Import Students</CardTitle>
-            <CardDescription>
-              Upload a CSV or Excel file to import student data
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="border-2 border-dashed rounded-lg p-8 text-center">
-              <Upload className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium">Upload file</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Drag and drop your CSV or Excel file here, or click to browse
-              </p>
-              <Button variant="outline" className="mt-4" onClick={() => setIsImportStudentsDialogOpen(true)}>
-                Select File
-              </Button>
-              <p className="mt-2 text-xs text-gray-500">
-                Supported formats: CSV, XLSX
-              </p>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell>
+                        <Badge variant="outline">{student.roll_number}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
+                      <TableCell>{student.email || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button variant="outline" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleDeleteStudent(student.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
-        </Card> */}
+        </Card>
       </div>
       <AddStudentDialog 
         isOpen={isAddStudentDialogOpen} 

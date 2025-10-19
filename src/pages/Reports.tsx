@@ -14,6 +14,7 @@ import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Semester, Student } from "@/lib/db";
+import Papa from "papaparse"; // Import PapaParse for CSV export
 
 const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
@@ -192,10 +193,35 @@ const Reports = () => {
   };
 
   const handleDownload = () => {
-    // In a real app, this would generate and download a report
+    if (studentReports.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no student attendance records to export based on current filters.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const headers = ["Roll No.", "Student Name", "Class", "Attendance %"];
+    const csvRows = studentReports.map(student => [
+      student.roll,
+      student.name,
+      student.class,
+      `${student.attendance}%`
+    ].map(field => `"${field}"`).join(',')); // Wrap fields in quotes to handle commas
+
+    const csvString = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'attendance_report.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
     toast({
-      title: "Download Report",
-      description: "Report download functionality will be implemented in a future update."
+      title: "Report Downloaded",
+      description: "Attendance report has been downloaded as attendance_report.csv.",
     });
   };
 
@@ -321,34 +347,36 @@ const Reports = () => {
               <CardDescription>Individual student attendance percentages</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Roll No.</TableHead>
-                    <TableHead>Student Name</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead className="text-right">Attendance %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {studentReports.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell>
-                        <Badge variant="outline">{student.roll}</Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>{student.class}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge 
-                          variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
-                        >
-                          {student.attendance}%
-                        </Badge>
-                      </TableCell>
+              <div className="overflow-x-auto"> {/* Added for horizontal scrolling on mobile */}
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Roll No.</TableHead>
+                      <TableHead>Student Name</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead className="text-right">Attendance %</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {studentReports.map((student) => (
+                      <TableRow key={student.id}>
+                        <TableCell>
+                          <Badge variant="outline">{student.roll}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{student.name}</TableCell>
+                        <TableCell>{student.class}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge 
+                            variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
+                          >
+                            {student.attendance}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </div>

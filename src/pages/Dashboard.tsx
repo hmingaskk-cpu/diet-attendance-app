@@ -102,12 +102,12 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-50">
       <Navigation />
       <div className="p-4 md:p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6"> {/* Adjusted for mobile stacking */}
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Attendance Dashboard</h1>
             <p className="text-gray-600">Welcome back, {facultyName}</p>
           </div>
-          <Badge variant="secondary">{role}</Badge>
+          <Badge variant="secondary" className="mt-3 md:mt-0">{role}</Badge> {/* Added margin-top for mobile */}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -163,12 +163,14 @@ const Dashboard = () => {
               <div className="space-y-4">
                 {semesters.map((semester) => (
                   <Link to={`/attendance/${semester.id}`} key={semester.id}>
-                    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors space-y-2 sm:space-y-0"> {/* Adjusted for mobile stacking */}
                       <div>
                         <h3 className="font-medium">{semester.name}</h3>
                         <p className="text-sm text-gray-500">{studentCounts[semester.id] || 0} students</p>
                       </div>
-                      <Button variant="outline">Take Attendance</Button>
+                      <Button variant="outline" className="w-full sm:w-auto"> {/* Added w-full for mobile */}
+                        Take Attendance
+                      </Button>
                     </div>
                   </Link>
                 ))}
