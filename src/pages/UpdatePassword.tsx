@@ -150,10 +150,10 @@ const UpdatePassword = () => {
                   <Link to="/login">Back to Login</Link>
                 </Button>
               </CardFooter>
-            </CardFooter>
-          </form>
-        </Form>
-      </Card>
+            </form>
+          </Form>
+        </Card>
+      </div>
     </div>
   );
 };
