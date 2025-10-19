@@ -12,6 +12,8 @@ import Students from "./pages/Students";
 import Faculty from "./pages/Faculty";
 import LoginForm from "./components/auth/LoginForm";
 import SignupForm from "./components/auth/SignupForm";
+import ForgotPassword from "./pages/ForgotPassword"; // New import
+import UpdatePassword from "./pages/UpdatePassword"; // New import
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
@@ -65,6 +67,8 @@ const AuthenticatedApp = () => {
       <Route path="/" element={<Index />} /> {/* This will now redirect to /login */}
       <Route path="/login" element={<LoginForm />} />
       <Route path="/signup" element={<SignupForm />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} /> {/* New route */}
+      <Route path="/update-password" element={<UpdatePassword />} /> {/* New route */}
       <Route 
         path="/dashboard" 
         element={

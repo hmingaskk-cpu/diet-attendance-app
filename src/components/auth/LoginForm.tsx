@@ -177,6 +177,9 @@ const LoginForm = () => {
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
               <Button variant="link" className="mt-2" type="button" asChild>
+                <Link to="/forgot-password">Forgot password?</Link>
+              </Button>
+              <Button variant="link" className="mt-2" type="button" asChild>
                 <Link to="/signup">Don't have an account? Sign Up</Link>
               </Button>
             </CardFooter>

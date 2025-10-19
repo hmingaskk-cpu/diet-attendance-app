@@ -34,9 +34,12 @@ const editFacultyFormSchema = z.object({
   role: z.enum(["faculty", "admin"], {
     message: "Please select a valid role.",
   }),
-  status: z.enum(["active", "inactive"], {
+  status: z.enum(["active", "inactive", "pending"], { // Added 'pending' status
     message: "Please select a valid status.",
   }),
+  newPassword: z.string().min(6, {
+    message: "Password must be at least 6 characters.",
+  }).optional().or(z.literal("")), // Optional password field
 });
 
 type EditFacultyFormValues = z.infer<typeof editFacultyFormSchema>;
@@ -59,6 +62,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
       email: "",
       role: "faculty",
       status: "active",
+      newPassword: "", // Initialize new password field
     },
   });
 
@@ -68,7 +72,8 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
         name: facultyMember.name,
         email: facultyMember.email,
         role: facultyMember.role as "faculty" | "admin",
-        status: facultyMember.status as "active" | "inactive",
+        status: facultyMember.status as "active" | "inactive" | "pending", // Include pending
+        newPassword: "", // Always clear password field on open
       });
     }
   }, [isOpen, facultyMember, form]);
@@ -79,7 +84,8 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
     setIsLoading(true);
     
     try {
-      const { error } = await supabase
+      // Update user details in public.users table
+      const { error: userUpdateError } = await supabase
         .from('users')
         .update({
           name: values.name,
@@ -90,7 +96,35 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
         })
         .eq('id', facultyMember.id);
 
-      if (error) throw error;
+      if (userUpdateError) throw userUpdateError;
+
+      // If a new password is provided, call the Edge Function to update it
+      if (values.newPassword) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("User not authenticated to perform this action.");
+        }
+
+        // Call the Edge Function to update the password
+        const { data: passwordUpdateData, error: passwordUpdateError } = await supabase.functions.invoke(
+          'admin-update-user-password',
+          {
+            body: JSON.stringify({ userId: facultyMember.id, newPassword: values.newPassword }),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${user.access_token}`, // Pass current admin's token
+            },
+          }
+        );
+
+        if (passwordUpdateError) {
+          console.error("Edge Function error:", passwordUpdateError);
+          throw new Error(passwordUpdateError.message || "Failed to update password via Edge Function.");
+        }
+        if (passwordUpdateData && passwordUpdateData.error) {
+          throw new Error(passwordUpdateData.error);
+        }
+      }
 
       toast({
         title: "Faculty Member Updated",
@@ -190,8 +224,29 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
                       <SelectContent>
                         <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem> {/* Added pending */}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Password (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Enter new password if changing"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Leave blank if you don't want to change the password.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
