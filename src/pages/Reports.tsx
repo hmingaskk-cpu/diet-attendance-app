@@ -370,34 +370,36 @@ const Reports = () => {
                   <CardDescription>Individual student attendance percentages</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Roll No.</TableHead>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>Class</TableHead>
-                        <TableHead className="text-right">Attendance %</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {studentReports.map((student) => (
-                        <TableRow key={student.id}>
-                          <TableCell>
-                            <Badge variant="outline">{student.roll}</Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">{student.name}</TableCell>
-                          <TableCell>{student.class}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge 
-                              variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
-                            >
-                              {student.attendance}%
-                            </Badge>
-                          </TableCell>
+                  <div className="overflow-x-auto"> {/* Make table horizontally scrollable */}
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Roll No.</TableHead>
+                          <TableHead>Student Name</TableHead>
+                          <TableHead>Class</TableHead>
+                          <TableHead className="text-right">Attendance %</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {studentReports.map((student) => (
+                          <TableRow key={student.id}>
+                            <TableCell>
+                              <Badge variant="outline">{student.roll}</Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">{student.name}</TableCell>
+                            <TableCell>{student.class}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge 
+                                variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
+                              >
+                                {student.attendance}%
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </div>

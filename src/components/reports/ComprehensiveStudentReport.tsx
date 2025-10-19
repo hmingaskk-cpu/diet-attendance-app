@@ -263,7 +263,7 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
             No attendance data available for the selected student in this date range.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto"> {/* Make table horizontally scrollable */}
             <Table>
               <TableHeader>
                 <TableRow>
