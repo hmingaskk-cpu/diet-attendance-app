@@ -182,3 +182,24 @@ export const getStudentAttendanceReport = async (studentId: number) => {
   if (error) throw error
   return data
 }
+
+export const getComprehensiveStudentAttendance = async (semesterId: number, startDate: string, endDate: string) => {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select(`
+      date,
+      period,
+      is_present,
+      student:students (id, name, roll_number),
+      semester:semesters (name)
+    `)
+    .eq('semester_id', semesterId)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('student.name')
+    .order('date')
+    .order('period');
+
+  if (error) throw error;
+  return data;
+}

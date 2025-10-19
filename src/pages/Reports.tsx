@@ -15,6 +15,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Semester, Student } from "@/lib/db";
 import Papa from "papaparse"; // Import PapaParse for CSV export
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
+import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport"; // Import new component
 
 const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
@@ -318,73 +320,96 @@ const Reports = () => {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Attendance Overview</CardTitle>
-              <CardDescription>Daily attendance statistics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={attendanceData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="present" fill="#10b981" name="Present" />
-                    <Bar dataKey="absent" fill="#ef4444" name="Absent" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="daily-student-report" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="daily-student-report">Daily & Student Attendance</TabsTrigger>
+            <TabsTrigger value="comprehensive-student-report" disabled={selectedClass === "all"}>Comprehensive Student Report</TabsTrigger>
+          </TabsList>
+          <TabsContent value="daily-student-report">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Attendance Overview</CardTitle>
+                  <CardDescription>Daily attendance statistics</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={attendanceData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="present" fill="#10b981" name="Present" />
+                        <Bar dataKey="absent" fill="#ef4444" name="Absent" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Student Attendance</CardTitle>
-              <CardDescription>Individual student attendance percentages</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Roll No.</TableHead>
-                    <TableHead>Student Name</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead className="text-right">Attendance %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {studentReports.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell>
-                        <Badge variant="outline">{student.roll}</Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>{student.class}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge 
-                          variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
-                        >
-                          {student.attendance}%
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Student Attendance</CardTitle>
+                  <CardDescription>Individual student attendance percentages</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Roll No.</TableHead>
+                        <TableHead>Student Name</TableHead>
+                        <TableHead>Class</TableHead>
+                        <TableHead className="text-right">Attendance %</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {studentReports.map((student) => (
+                        <TableRow key={student.id}>
+                          <TableCell>
+                            <Badge variant="outline">{student.roll}</Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">{student.name}</TableCell>
+                          <TableCell>{student.class}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge 
+                              variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
+                            >
+                              {student.attendance}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
 
-        <div className="flex justify-end">
-          <Button onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Download Report
-          </Button>
-        </div>
+            <div className="flex justify-end">
+              <Button onClick={handleDownload}>
+                <Download className="mr-2 h-4 w-4" />
+                Download Report
+              </Button>
+            </div>
+          </TabsContent>
+          <TabsContent value="comprehensive-student-report">
+            {selectedClass === "all" ? (
+              <Card>
+                <CardContent className="p-6 text-center text-gray-500">
+                  Please select a specific class (semester) to view the comprehensive student report.
+                </CardContent>
+              </Card>
+            ) : (
+              <ComprehensiveStudentReport 
+                semesterId={parseInt(selectedClass)} 
+                startDate={dateRange.from} 
+                endDate={dateRange.to} 
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
