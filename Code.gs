@@ -10,24 +10,24 @@ function doPost(e) {
       var date = requestBody.date;
       var period = requestBody.period; // This is the specific period being submitted (e.g., 1, 2, 3)
       var semesterName = requestBody.semesterName;
-      var facultyName = requestBody.facultyName;
+      // var facultyName = requestBody.facultyName; // Removed as per request
       var studentsAttendance = requestBody.studentsAttendance; // Array of { name, roll_number, is_present }
 
       var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
       var sheetName = semesterName + " Attendance";
       var sheet = spreadsheet.getSheetByName(sheetName);
 
-      var headers = ["Date", "Semester", "Student Name", "Roll Number", "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6", "Faculty Name"];
+      // Updated headers - removed "Faculty Name"
+      var headers = ["Date", "Semester", "Student Name", "Roll Number", "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6"];
       
       if (!sheet) {
         sheet = spreadsheet.insertSheet(sheetName);
         sheet.appendRow(headers);
         Logger.log("Created new sheet: " + sheetName + " with headers: " + JSON.stringify(headers));
       } else {
-        // Optional: Check if existing headers match. If not, you might need to manually adjust or recreate the sheet.
         var existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         if (JSON.stringify(existingHeaders) !== JSON.stringify(headers)) {
-          Logger.log("WARNING: Existing headers in sheet '" + sheetName + "' do not match expected headers. Data might be written to incorrect columns. Expected: " + JSON.stringify(headers) + ", Found: " + JSON.stringify(existingHeaders));
+          Logger.log("WARNING: Existing headers in sheet '" + sheetName + "' do not match expected headers. Expected: " + JSON.stringify(headers) + ", Found: " + JSON.stringify(existingHeaders));
           // For robust production, you might want to throw an error or attempt to fix headers.
           // For this exercise, we'll proceed assuming the sheet structure is correct or will be manually fixed.
         }
@@ -42,11 +42,10 @@ function doPost(e) {
       var semesterCol = headerRow.indexOf("Semester");
       var studentNameCol = headerRow.indexOf("Student Name");
       var rollNumberCol = headerRow.indexOf("Roll Number");
-      var facultyNameCol = headerRow.indexOf("Faculty Name");
       var targetPeriodCol = headerRow.indexOf("Period " + period);
 
       // Basic validation for column existence
-      if (dateCol === -1 || semesterCol === -1 || studentNameCol === -1 || rollNumberCol === -1 || facultyNameCol === -1 || targetPeriodCol === -1) {
+      if (dateCol === -1 || semesterCol === -1 || studentNameCol === -1 || rollNumberCol === -1 || targetPeriodCol === -1) {
         throw new Error("One or more required columns not found in sheet: " + sheetName + ". Please ensure headers are correct: " + JSON.stringify(headers));
       }
 
@@ -55,17 +54,20 @@ function doPost(e) {
 
       studentsAttendance.forEach(function(student) {
         var studentFound = false;
+        var studentNameTrimmed = student.name.trim();
+        var rollNumberTrimmed = student.roll_number.trim();
+
         for (var i = 1; i < values.length; i++) { // Start from 1 to skip header row
           var row = values[i];
-          // Check if row matches date, semester, student name, and roll number
+          // Check if row matches date, semester, student name, and roll number (trimmed for robustness)
           if (row[dateCol] === date &&
               row[semesterCol] === semesterName &&
-              row[studentNameCol] === student.name &&
-              row[rollNumberCol] === student.roll_number) {
+              String(row[studentNameCol]).trim() === studentNameTrimmed &&
+              String(row[rollNumberCol]).trim() === rollNumberTrimmed) {
             
             // Found existing row, update it
             row[targetPeriodCol] = student.is_present ? "Present" : "Absent";
-            row[facultyNameCol] = facultyName; // Update faculty name in the last column
+            // No faculty name column to update
             sheet.getRange(i + 1, 1, 1, row.length).setValues([row]); // Update the specific row
             studentFound = true;
             updatedRowsCount++;
@@ -81,7 +83,7 @@ function doPost(e) {
           newRow[studentNameCol] = student.name;
           newRow[rollNumberCol] = student.roll_number;
           newRow[targetPeriodCol] = student.is_present ? "Present" : "Absent";
-          newRow[facultyNameCol] = facultyName;
+          // No faculty name column to set
           sheet.appendRow(newRow);
           newRowsCount++;
         }
