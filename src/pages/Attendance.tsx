@@ -472,31 +472,11 @@ const Attendance = () => {
         </Card>
 
         <div className="mt-6 flex justify-end">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button size="lg" disabled={isSubmitDisabled}>
-                <Save className="mr-2 h-4 w-4" />
-                Submit Attendance
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Attendance Submission</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to submit attendance for Period {period} on {date}?
-                  {globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole === 'admin' && (
-                    <p className="text-orange-600 mt-2">
-                      As an admin, this action will overwrite existing attendance data for this period.
-                    </p>
-                  )}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleSubmit}>Confirm Submit</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {/* Temporarily removed AlertDialogTrigger and AlertDialogContent for debugging */}
+          <Button size="lg" onClick={handleSubmit} disabled={isSubmitDisabled}>
+            <Save className="mr-2 h-4 w-4" />
+            Submit Attendance
+          </Button>
         </div>
       </div>
       <MobileBottomNavigation />
