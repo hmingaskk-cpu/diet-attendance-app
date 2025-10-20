@@ -247,16 +247,15 @@ const Attendance = () => {
         const { data: exportData, error: exportError } = await supabase.functions.invoke(
           'export-attendance-to-sheets',
           {
-            body: JSON.stringify({
+            // Pass a plain object here; supabase.functions.invoke will stringify it and set Content-Type
+            body: {
               date,
               period: currentPeriodNum,
               semesterName,
               facultyName,
               studentsAttendance: studentsForExport,
-            }),
-            headers: {
-              'Content-Type': 'application/json',
             },
+            // Remove explicit headers as invoke handles Content-Type
           }
         );
 
