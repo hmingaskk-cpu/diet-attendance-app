@@ -259,8 +259,8 @@ const Attendance = () => {
         const { data: exportData, error: exportError } = await supabase.functions.invoke(
           'export-attendance-to-sheets',
           {
-            body: exportBody,
-            headers: { 'Content-Type': 'application/json' }, // ADDED THIS LINE
+            body: JSON.stringify(exportBody), // <--- CRITICAL CHANGE HERE
+            headers: { 'Content-Type': 'application/json' },
           }
         );
 
