@@ -8,40 +8,87 @@ function doPost(e) {
       Logger.log("Received request body: " + JSON.stringify(requestBody));
 
       var date = requestBody.date;
-      var period = requestBody.period;
+      var period = requestBody.period; // This is the specific period being submitted (e.g., 1, 2, 3)
       var semesterName = requestBody.semesterName;
       var facultyName = requestBody.facultyName;
-      var studentsAttendance = requestBody.studentsAttendance;
+      var studentsAttendance = requestBody.studentsAttendance; // Array of { name, roll_number, is_present }
 
-      // Get the active spreadsheet and the target sheet
       var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-      var sheetName = semesterName + " Attendance"; // Example: "1st Semester Attendance"
+      var sheetName = semesterName + " Attendance";
       var sheet = spreadsheet.getSheetByName(sheetName);
 
+      var headers = ["Date", "Semester", "Student Name", "Roll Number", "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6", "Faculty Name"];
+      
       if (!sheet) {
-        // If sheet doesn't exist, create it and add headers
         sheet = spreadsheet.insertSheet(sheetName);
-        var headers = ["Date", "Period", "Faculty", "Student Name", "Roll Number", "Status"];
         sheet.appendRow(headers);
-        Logger.log("Created new sheet: " + sheetName);
+        Logger.log("Created new sheet: " + sheetName + " with headers: " + JSON.stringify(headers));
+      } else {
+        // Optional: Check if existing headers match. If not, you might need to manually adjust or recreate the sheet.
+        var existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        if (JSON.stringify(existingHeaders) !== JSON.stringify(headers)) {
+          Logger.log("WARNING: Existing headers in sheet '" + sheetName + "' do not match expected headers. Data might be written to incorrect columns. Expected: " + JSON.stringify(headers) + ", Found: " + JSON.stringify(existingHeaders));
+          // For robust production, you might want to throw an error or attempt to fix headers.
+          // For this exercise, we'll proceed assuming the sheet structure is correct or will be manually fixed.
+        }
       }
 
-      // Append attendance records
-      var rows = [];
+      var dataRange = sheet.getDataRange();
+      var values = dataRange.getValues(); // Get all data from the sheet
+      var headerRow = values[0]; // Assuming first row is header
+
+      // Find column indices dynamically
+      var dateCol = headerRow.indexOf("Date");
+      var semesterCol = headerRow.indexOf("Semester");
+      var studentNameCol = headerRow.indexOf("Student Name");
+      var rollNumberCol = headerRow.indexOf("Roll Number");
+      var facultyNameCol = headerRow.indexOf("Faculty Name");
+      var targetPeriodCol = headerRow.indexOf("Period " + period);
+
+      // Basic validation for column existence
+      if (dateCol === -1 || semesterCol === -1 || studentNameCol === -1 || rollNumberCol === -1 || facultyNameCol === -1 || targetPeriodCol === -1) {
+        throw new Error("One or more required columns not found in sheet: " + sheetName + ". Please ensure headers are correct: " + JSON.stringify(headers));
+      }
+
+      var updatedRowsCount = 0;
+      var newRowsCount = 0;
+
       studentsAttendance.forEach(function(student) {
-        rows.push([
-          date,
-          period,
-          facultyName,
-          student.name,
-          student.roll_number,
-          student.is_present ? "Present" : "Absent"
-        ]);
+        var studentFound = false;
+        for (var i = 1; i < values.length; i++) { // Start from 1 to skip header row
+          var row = values[i];
+          // Check if row matches date, semester, student name, and roll number
+          if (row[dateCol] === date &&
+              row[semesterCol] === semesterName &&
+              row[studentNameCol] === student.name &&
+              row[rollNumberCol] === student.roll_number) {
+            
+            // Found existing row, update it
+            row[targetPeriodCol] = student.is_present ? "Present" : "Absent";
+            row[facultyNameCol] = facultyName; // Update faculty name in the last column
+            sheet.getRange(i + 1, 1, 1, row.length).setValues([row]); // Update the specific row
+            studentFound = true;
+            updatedRowsCount++;
+            break;
+          }
+        }
+
+        if (!studentFound) {
+          // Create a new row for this student and date
+          var newRow = new Array(headers.length).fill(""); // Initialize with empty strings
+          newRow[dateCol] = date;
+          newRow[semesterCol] = semesterName;
+          newRow[studentNameCol] = student.name;
+          newRow[rollNumberCol] = student.roll_number;
+          newRow[targetPeriodCol] = student.is_present ? "Present" : "Absent";
+          newRow[facultyNameCol] = facultyName;
+          sheet.appendRow(newRow);
+          newRowsCount++;
+        }
       });
-      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
       
-      response = { status: "success", message: "Attendance data recorded successfully." };
-      Logger.log("Attendance data recorded successfully.");
+      response = { status: "success", message: "Attendance data recorded successfully. Updated " + updatedRowsCount + " rows, added " + newRowsCount + " rows." };
+      Logger.log(response.message);
 
     } else {
       response = { status: "error", message: "No POST data received." };
