@@ -18,28 +18,23 @@ serve(async (req) => {
     console.log(`  ${key}: ${value}`);
   }
 
-  let requestBodyText: string | null = null;
   let requestBodyJson: any = null;
 
   try {
-    // Attempt to read the raw text body first
-    requestBodyText = await req.text();
-    console.log('Raw request body received:', requestBodyText);
+    // Attempt to parse the request body directly as JSON
+    requestBodyJson = await req.json();
+    console.log('Parsed request body (JSON):', requestBodyJson);
 
-    // Then attempt to parse it as JSON
-    if (requestBodyText) {
-      requestBodyJson = JSON.parse(requestBodyText);
-      console.log('Parsed request body (JSON):', requestBodyJson);
-    } else {
-      console.log('Request body was empty.');
-      return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
+    if (!requestBodyJson || Object.keys(requestBodyJson).length === 0) {
+      console.log('Request body was empty or invalid JSON.');
+      return new Response(JSON.stringify({ error: 'Request body is empty or invalid JSON.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
     }
-  } catch (jsonError) {
+  } catch (jsonError: any) {
     console.error('Error parsing JSON body:', jsonError.message);
-    return new Response(JSON.stringify({ error: `Failed to parse request body as JSON: ${jsonError.message}. Raw body: ${requestBodyText}` }), {
+    return new Response(JSON.stringify({ error: `Failed to parse request body as JSON: ${jsonError.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
@@ -80,7 +75,7 @@ serve(async (req) => {
       status: 200,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in export-attendance-to-sheets Edge Function:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
