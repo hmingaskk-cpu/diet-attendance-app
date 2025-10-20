@@ -7,10 +7,9 @@ function doPost(e) {
       var requestBody = JSON.parse(e.postData.contents);
       Logger.log("Received request body: " + JSON.stringify(requestBody));
 
-      var date = requestBody.date;
+      var date = requestBody.date; // This is expected to be 'YYYY-MM-DD' string
       var period = requestBody.period; // This is the specific period being submitted (e.g., 1, 2, 3)
       var semesterName = requestBody.semesterName;
-      // var facultyName = requestBody.facultyName; // Removed as per request
       var studentsAttendance = requestBody.studentsAttendance; // Array of { name, roll_number, is_present }
 
       var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -56,18 +55,28 @@ function doPost(e) {
         var studentFound = false;
         var studentNameTrimmed = student.name.trim();
         var rollNumberTrimmed = student.roll_number.trim();
+        var semesterNameTrimmed = semesterName.trim(); // Trim semester name for comparison
 
         for (var i = 1; i < values.length; i++) { // Start from 1 to skip header row
           var row = values[i];
+          
+          // Format the date from the sheet to 'YYYY-MM-DD' string for robust comparison
+          var sheetDate = row[dateCol];
+          var formattedSheetDate = "";
+          if (sheetDate instanceof Date) {
+            formattedSheetDate = Utilities.formatDate(sheetDate, spreadsheet.getSpreadsheetTimeZone(), "yyyy-MM-dd");
+          } else {
+            formattedSheetDate = String(sheetDate).trim(); // Assume it's already a string or can be converted
+          }
+
           // Check if row matches date, semester, student name, and roll number (trimmed for robustness)
-          if (row[dateCol] === date &&
-              row[semesterCol] === semesterName &&
+          if (formattedSheetDate === date &&
+              String(row[semesterCol]).trim() === semesterNameTrimmed &&
               String(row[studentNameCol]).trim() === studentNameTrimmed &&
               String(row[rollNumberCol]).trim() === rollNumberTrimmed) {
             
             // Found existing row, update it
             row[targetPeriodCol] = student.is_present ? "Present" : "Absent";
-            // No faculty name column to update
             sheet.getRange(i + 1, 1, 1, row.length).setValues([row]); // Update the specific row
             studentFound = true;
             updatedRowsCount++;
@@ -83,7 +92,6 @@ function doPost(e) {
           newRow[studentNameCol] = student.name;
           newRow[rollNumberCol] = student.roll_number;
           newRow[targetPeriodCol] = student.is_present ? "Present" : "Absent";
-          // No faculty name column to set
           sheet.appendRow(newRow);
           newRowsCount++;
         }
