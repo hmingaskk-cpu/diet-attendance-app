@@ -39,7 +39,7 @@ const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState(""); // This will now filter the dropdown in ComprehensiveStudentReport
-  const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  const [attendanceData, setAttendanceData] = useState<any[]>([]); // Keep for potential future use or if chart is re-added
   const [studentReports, setStudentReports] = useState<any[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -114,7 +114,7 @@ const Reports = () => {
       if (!dateRange.from || !dateRange.to) return;
       
       try {
-        // Fetch attendance data for chart
+        // Fetch attendance data for chart (still fetching, but not displayed)
         let query = supabase
           .from('attendance_records')
           .select(`
@@ -391,29 +391,7 @@ const Reports = () => {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="daily-student-report">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <Card className="shadow-sm rounded-lg">
-                <CardHeader>
-                  <CardTitle>Attendance Overview</CardTitle>
-                  <CardDescription>Daily attendance statistics</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={attendanceData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="present" fill="#10b981" name="Present" />
-                        <Bar dataKey="absent" fill="#ef4444" name="Absent" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
+            <div className="grid grid-cols-1 gap-6 mb-6"> {/* Changed to grid-cols-1 */}
               <Card className="shadow-sm rounded-lg">
                 <CardHeader>
                   <div className="flex items-center justify-between">
