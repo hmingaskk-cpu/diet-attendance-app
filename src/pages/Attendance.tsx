@@ -238,7 +238,7 @@ const Attendance = () => {
         [currentPeriodNum]: 'taken-by-me'
       }));
 
-      // --- Invoke Edge Function for Google Sheets Export ---
+      // --- Invoke Edge Function for Google Sheets Export using direct fetch ---
       try {
         const studentsForExport = students.map(student => ({
           name: student.name,
@@ -254,30 +254,38 @@ const Attendance = () => {
           studentsAttendance: studentsForExport,
         };
 
-        console.log("Client-side: Sending body to Edge Function:", exportBody);
+        console.log("Client-side: Sending body to Edge Function (direct fetch):", exportBody);
 
-        const { data: exportData, error: exportError } = await supabase.functions.invoke(
-          'export-attendance-to-sheets',
-          {
-            body: JSON.stringify(exportBody), // <--- CRITICAL CHANGE HERE
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
 
-        if (exportError) {
-          console.error("Error invoking Edge Function for Google Sheets:", exportError);
-          toast({
-            title: "Google Sheets Export Failed",
-            description: `Failed to export attendance to Google Sheets: ${exportError.message}`,
-            variant: "destructive",
-          });
-        } else {
-          console.log("Google Sheets Export successful:", exportData);
-          toast({
-            title: "Google Sheets Exported",
-            description: "Attendance data has been exported to Google Sheets.",
-          });
+        if (!accessToken) {
+          throw new Error("User not authenticated for Edge Function export.");
         }
+
+        const edgeFunctionUrl = `https://ligxffklcdiosnitdqim.supabase.co/functions/v1/export-attendance-to-sheets`;
+
+        const response = await fetch(edgeFunctionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(exportBody),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Edge Function returned a non-2xx status: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("Google Sheets Export successful:", result);
+        toast({
+          title: "Google Sheets Exported",
+          description: "Attendance data has been exported to Google Sheets.",
+        });
+        
       } catch (exportInvokeError: any) {
         console.error("Unexpected error during Edge Function invocation:", exportInvokeError);
         toast({
