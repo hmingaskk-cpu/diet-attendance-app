@@ -244,18 +244,20 @@ const Attendance = () => {
           is_present: attendance[student.id.toString()] ?? false,
         }));
 
+        const exportBody = {
+          date,
+          period: currentPeriodNum,
+          semesterName,
+          facultyName,
+          studentsAttendance: studentsForExport,
+        };
+
+        console.log("Client-side: Sending body to Edge Function:", exportBody); // ADDED LOG
+
         const { data: exportData, error: exportError } = await supabase.functions.invoke(
           'export-attendance-to-sheets',
           {
-            // Pass a plain object here; supabase.functions.invoke will stringify it and set Content-Type
-            body: {
-              date,
-              period: currentPeriodNum,
-              semesterName,
-              facultyName,
-              studentsAttendance: studentsForExport,
-            },
-            // Remove explicit headers as invoke handles Content-Type
+            body: exportBody,
           }
         );
 
