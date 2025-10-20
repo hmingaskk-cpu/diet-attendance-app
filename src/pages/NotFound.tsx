@@ -16,7 +16,7 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
       <Navigation />
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 pb-20 md:pb-4"> {/* Adjusted padding */}
         <div className="text-center">

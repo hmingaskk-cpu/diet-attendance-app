@@ -144,7 +144,7 @@ const Students = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <Navigation />
         <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
@@ -157,7 +157,7 @@ const Students = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Navigation />
       <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
         <div className="mb-6">

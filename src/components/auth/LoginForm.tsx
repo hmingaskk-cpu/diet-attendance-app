@@ -108,8 +108,8 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200 p-4"> {/* Updated gradient */}
-      <Card className="w-full max-w-md shadow-lg rounded-lg"> {/* Added shadow-lg and rounded-lg */}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-indigo-100 p-4">
+      <Card className="w-full max-w-md shadow-lg rounded-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-gray-800">DIET Kolasib Attendance System</CardTitle>
           <CardDescription className="text-lg text-gray-600 mt-2">

@@ -95,10 +95,10 @@ const SignupForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-indigo-200"> {/* Updated gradient */}
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
       <Navigation />
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4">
-        <Card className="w-full max-w-md shadow-lg rounded-lg"> {/* Added shadow-lg and rounded-lg */}
+        <Card className="w-full max-w-md shadow-lg rounded-lg">
           <CardHeader>
             <CardTitle>Create Account</CardTitle>
             <CardDescription>
