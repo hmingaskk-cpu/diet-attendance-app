@@ -158,6 +158,8 @@ const Attendance = () => {
   };
 
   const handleSubmit = async () => {
+    console.log("handleSubmit triggered!"); // NEW LOG HERE
+
     if (!facultyId) {
       toast({
         title: "Authentication Error",
