@@ -7,25 +7,31 @@ function doPost(e) {
       var requestBody = JSON.parse(e.postData.contents);
       Logger.log("Received request body: " + JSON.stringify(requestBody));
 
-      var date = requestBody.date; // This is expected to be 'YYYY-MM-DD' string from client
+      // date and facultyName are no longer stored in the Google Sheet, but still passed from client
       var period = requestBody.period; // This is the specific period being submitted (e.g., 1, 2, 3)
       var semesterName = requestBody.semesterName;
       var studentsAttendance = requestBody.studentsAttendance; // Array of { name, roll_number, is_present }
 
       var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-      var sheetName = semesterName + " Attendance";
+      var sheetName = semesterName + " Attendance"; // Sheet name defines the semester
       var sheet = spreadsheet.getSheetByName(sheetName);
 
-      // Updated headers - removed "Faculty Name"
-      var headers = ["Date", "Semester", "Student Name", "Roll Number", "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6"];
+      // New simplified headers
+      var headers = ["Student Name", "Roll Number", "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6"];
       
       if (!sheet) {
         sheet = spreadsheet.insertSheet(sheetName);
         sheet.appendRow(headers);
         Logger.log("Created new sheet: " + sheetName + " with headers: " + JSON.stringify(headers));
       } else {
+        // Clear all content except the header row to ensure a "clean sheet" for the day
+        var lastRow = sheet.getLastRow();
+        if (lastRow > 1) { // If there's data beyond the header
+          sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+          Logger.log("Cleared existing data in sheet: " + sheetName);
+        }
+
         var existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-        // Check if existing headers match, ignoring case and trimming for comparison
         var trimmedExistingHeaders = existingHeaders.map(h => String(h).trim());
         var trimmedExpectedHeaders = headers.map(h => String(h).trim());
 
@@ -36,19 +42,18 @@ function doPost(e) {
         }
       }
 
+      // Re-fetch values after clearing, or if sheet was just created
       var dataRange = sheet.getDataRange();
-      var values = dataRange.getValues(); // Get all data from the sheet
+      var values = dataRange.getValues(); // Get all data from the sheet (now only headers or empty)
       var headerRow = values[0]; // Assuming first row is header
 
-      // Find column indices dynamically
-      var dateCol = headerRow.indexOf("Date");
-      var semesterCol = headerRow.indexOf("Semester");
+      // Find column indices dynamically based on new headers
       var studentNameCol = headerRow.indexOf("Student Name");
       var rollNumberCol = headerRow.indexOf("Roll Number");
       var targetPeriodCol = headerRow.indexOf("Period " + period);
 
       // Basic validation for column existence
-      if (dateCol === -1 || semesterCol === -1 || studentNameCol === -1 || rollNumberCol === -1 || targetPeriodCol === -1) {
+      if (studentNameCol === -1 || rollNumberCol === -1 || targetPeriodCol === -1) {
         throw new Error("One or more required columns not found in sheet: " + sheetName + ". Please ensure headers are correct: " + JSON.stringify(headers));
       }
 
@@ -59,54 +64,37 @@ function doPost(e) {
         var studentFound = false;
         var studentNameTrimmed = student.name.trim();
         var rollNumberTrimmed = student.roll_number.trim();
-        var semesterNameTrimmed = semesterName.trim(); // Trim semester name from request
 
-        Logger.log("--- Searching for student: " + studentNameTrimmed + " (Roll: " + rollNumberTrimmed + ") for Date: " + date + ", Semester: " + semesterNameTrimmed + " ---");
+        Logger.log("--- Processing student: " + studentNameTrimmed + " (Roll: " + rollNumberTrimmed + ") for Period: " + period + " ---");
 
+        // Since we clear the sheet, we will always be adding new rows for the current submission.
+        // The "update" logic is now effectively "create a new row for this student for this submission".
+        // However, we still iterate to ensure no duplicates are accidentally created if the clear failed or if
+        // multiple submissions happen very quickly without a full clear.
         for (var i = 1; i < values.length; i++) { // Start from 1 to skip header row
           var row = values[i];
           
-          // Explicitly format the date from the sheet to 'YYYY-MM-DD' string for robust comparison
-          var sheetDateValue = row[dateCol];
-          var formattedSheetDate = "";
-          if (sheetDateValue instanceof Date) {
-            formattedSheetDate = Utilities.formatDate(sheetDateValue, spreadsheet.getSpreadsheetTimeZone(), "yyyy-MM-dd");
-          } else {
-            // If it's not a Date object, assume it's already a string or can be converted and trimmed
-            formattedSheetDate = String(sheetDateValue).trim();
-          }
-
-          var sheetSemesterName = String(row[semesterCol]).trim();
           var sheetStudentName = String(row[studentNameCol]).trim();
           var sheetRollNumber = String(row[rollNumberCol]).trim();
 
           Logger.log("  Comparing with row " + (i + 1) + ":");
-          Logger.log("    Request Date: '" + date + "' vs Sheet Date: '" + formattedSheetDate + "' (Match: " + (date === formattedSheetDate) + ")");
-          Logger.log("    Request Semester: '" + semesterNameTrimmed + "' vs Sheet Semester: '" + sheetSemesterName + "' (Match: " + (semesterNameTrimmed === sheetSemesterName) + ")");
           Logger.log("    Request Student Name: '" + studentNameTrimmed + "' vs Sheet Student Name: '" + sheetStudentName + "' (Match: " + (studentNameTrimmed === sheetStudentName) + ")");
           Logger.log("    Request Roll Number: '" + rollNumberTrimmed + "' vs Sheet Roll Number: '" + sheetRollNumber + "' (Match: " + (rollNumberTrimmed === sheetRollNumber) + ")");
 
-          // Check if row matches date, semester, student name, and roll number (all trimmed for robustness)
-          if (formattedSheetDate === date &&
-              sheetSemesterName === semesterNameTrimmed &&
-              sheetStudentName === studentNameTrimmed &&
-              sheetRollNumber === rollNumberTrimmed) {
-            
-            // Found existing row, update it
+          if (sheetStudentName === studentNameTrimmed && sheetRollNumber === rollNumberTrimmed) {
+            // Found existing row (should only happen if clear failed or very fast resubmission)
             row[targetPeriodCol] = student.is_present ? "Present" : "Absent";
-            sheet.getRange(i + 1, 1, 1, row.length).setValues([row]); // Update the specific row
+            sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
             studentFound = true;
             updatedRowsCount++;
-            Logger.log("  -> Row " + (i + 1) + " updated successfully.");
+            Logger.log("  -> Existing row " + (i + 1) + " updated for " + student.name + ".");
             break;
           }
         }
 
         if (!studentFound) {
-          // Create a new row for this student and date
+          // Create a new row for this student
           var newRow = new Array(headers.length).fill(""); // Initialize with empty strings
-          newRow[dateCol] = date;
-          newRow[semesterCol] = semesterName;
           newRow[studentNameCol] = student.name;
           newRow[rollNumberCol] = student.roll_number;
           newRow[targetPeriodCol] = student.is_present ? "Present" : "Absent";
