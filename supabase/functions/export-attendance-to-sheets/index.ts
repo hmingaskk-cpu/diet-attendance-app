@@ -11,28 +11,42 @@ serve(async (req) => {
   }
 
   console.log('Edge Function received request.');
-  console.log('Request headers:', req.headers);
+  console.log('Request method:', req.method);
+  console.log('Request URL:', req.url);
+  console.log('Request headers:');
+  for (const [key, value] of req.headers.entries()) {
+    console.log(`  ${key}: ${value}`);
+  }
 
-  let requestBody;
+  let requestBodyText: string | null = null;
+  let requestBodyJson: any = null;
+
   try {
-    requestBody = await req.json();
-    console.log('Parsed request body:', requestBody);
+    // Attempt to read the raw text body first
+    requestBodyText = await req.text();
+    console.log('Raw request body received:', requestBodyText);
+
+    // Then attempt to parse it as JSON
+    if (requestBodyText) {
+      requestBodyJson = JSON.parse(requestBodyText);
+      console.log('Parsed request body (JSON):', requestBodyJson);
+    } else {
+      console.log('Request body was empty.');
+      return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
   } catch (jsonError) {
     console.error('Error parsing JSON body:', jsonError.message);
-    try {
-      const rawBody = await req.text();
-      console.error('Raw request body:', rawBody);
-    } catch (textError) {
-      console.error('Could not read raw request body:', textError.message);
-    }
-    return new Response(JSON.stringify({ error: 'Failed to parse request body as JSON. Ensure Content-Type is application/json and body is valid JSON.' }), {
+    return new Response(JSON.stringify({ error: `Failed to parse request body as JSON: ${jsonError.message}. Raw body: ${requestBodyText}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
   }
 
   try {
-    const { date, period, semesterName, facultyName, studentsAttendance } = requestBody;
+    const { date, period, semesterName, facultyName, studentsAttendance } = requestBodyJson;
 
     const googleSheetsWebAppUrl = Deno.env.get('GOOGLE_SHEETS_WEB_APP_URL');
 
