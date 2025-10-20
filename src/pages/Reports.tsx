@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Download, Filter } from "lucide-react";
+import { Calendar, Download, Filter, ListFilter } from "lucide-react"; // Import ListFilter icon
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -20,6 +20,20 @@ import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStuden
 import DeleteAllAttendanceDialog from "@/components/reports/DeleteAllAttendanceDialog"; // Import new component
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 import MobileBottomNavigation from "@/components/MobileBottomNavigation"; // Import MobileBottomNavigation
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const reportColumnOptions = [
+  { value: "total_periods_marked", label: "Total Periods Marked" },
+  { value: "total_present", label: "Total Present" },
+  { value: "attendance_percentage", label: "Attendance Percentage" },
+];
 
 const Reports = () => {
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
@@ -31,6 +45,9 @@ const Reports = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState(""); // State to store current user's role
+  const [selectedReportColumns, setSelectedReportColumns] = useState<string[]>(
+    reportColumnOptions.map(option => option.value)
+  );
   const { toast } = useToast();
 
   const fetchInitialData = async () => {
@@ -221,13 +238,33 @@ const Reports = () => {
       return;
     }
 
-    const headers = ["Roll No.", "Student Name", "Class", "Attendance %"];
-    const csvRows = studentReports.map(student => [
-      student.roll,
-      student.name,
-      student.class,
-      `${student.attendance}%`
-    ].map(field => `"${field}"`).join(',')); // Wrap fields in quotes to handle commas
+    const headers = ["Roll No.", "Student Name", "Class"];
+    const dataKeys: (keyof typeof studentReports[0] | "attendance_percentage_string")[] = ["roll", "name", "class"];
+
+    if (selectedReportColumns.includes("total_periods_marked")) {
+      headers.push("Total Periods Marked");
+      dataKeys.push("total");
+    }
+    if (selectedReportColumns.includes("total_present")) {
+      headers.push("Total Present");
+      dataKeys.push("present");
+    }
+    if (selectedReportColumns.includes("attendance_percentage")) {
+      headers.push("Attendance %");
+      dataKeys.push("attendance_percentage_string"); // Custom key for formatted percentage
+    }
+
+    const csvRows = studentReports.map(student => {
+      const row: (string | number)[] = [];
+      dataKeys.forEach(key => {
+        if (key === "attendance_percentage_string") {
+          row.push(`${student.attendance}%`);
+        } else {
+          row.push(student[key as keyof typeof student]);
+        }
+      });
+      return row.map(field => `"${field}"`).join(','); // Wrap fields in quotes to handle commas
+    });
 
     const csvString = [headers.join(','), ...csvRows].join('\n');
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
@@ -379,7 +416,35 @@ const Reports = () => {
 
               <Card className="shadow-sm rounded-lg">
                 <CardHeader>
-                  <CardTitle>Student Attendance</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Student Attendance</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <ListFilter className="mr-2 h-4 w-4" /> Customize Columns
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[200px]">
+                        <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {reportColumnOptions.map((option) => (
+                          <DropdownMenuCheckboxItem
+                            key={option.value}
+                            checked={selectedReportColumns.includes(option.value)}
+                            onCheckedChange={(checked) => {
+                              setSelectedReportColumns((prev) =>
+                                checked
+                                  ? [...prev, option.value]
+                                  : prev.filter((col) => col !== option.value)
+                              );
+                            }}
+                          >
+                            {option.label}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                   <CardDescription>Individual student attendance percentages</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -390,7 +455,9 @@ const Reports = () => {
                           <TableHead>Roll No.</TableHead>
                           <TableHead>Student Name</TableHead>
                           <TableHead>Class</TableHead>
-                          <TableHead className="text-right">Attendance %</TableHead>
+                          {selectedReportColumns.includes("total_periods_marked") && <TableHead>Total Periods Marked</TableHead>}
+                          {selectedReportColumns.includes("total_present") && <TableHead>Total Present</TableHead>}
+                          {selectedReportColumns.includes("attendance_percentage") && <TableHead className="text-right">Attendance %</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -401,13 +468,17 @@ const Reports = () => {
                             </TableCell>
                             <TableCell className="font-medium">{student.name}</TableCell>
                             <TableCell>{student.class}</TableCell>
-                            <TableCell className="text-right">
-                              <Badge 
-                                variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
-                              >
-                                {student.attendance}%
-                              </Badge>
-                            </TableCell>
+                            {selectedReportColumns.includes("total_periods_marked") && <TableCell>{student.total}</TableCell>}
+                            {selectedReportColumns.includes("total_present") && <TableCell>{student.present}</TableCell>}
+                            {selectedReportColumns.includes("attendance_percentage") && (
+                              <TableCell className="text-right">
+                                <Badge 
+                                  variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
+                                >
+                                  {student.attendance}%
+                                </Badge>
+                              </TableCell>
+                            )}
                           </TableRow>
                         ))}
                       </TableBody>
