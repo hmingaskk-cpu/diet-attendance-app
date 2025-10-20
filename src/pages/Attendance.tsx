@@ -236,6 +236,54 @@ const Attendance = () => {
         [currentPeriodNum]: 'taken-by-me'
       }));
 
+      // --- Invoke Edge Function for Google Sheets Export ---
+      try {
+        const studentsForExport = students.map(student => ({
+          name: student.name,
+          roll_number: student.roll_number,
+          is_present: attendance[student.id.toString()] ?? false,
+        }));
+
+        const { data: exportData, error: exportError } = await supabase.functions.invoke(
+          'export-attendance-to-sheets',
+          {
+            body: JSON.stringify({
+              date,
+              period: currentPeriodNum,
+              semesterName,
+              facultyName,
+              studentsAttendance: studentsForExport,
+            }),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (exportError) {
+          console.error("Error invoking Edge Function for Google Sheets:", exportError);
+          toast({
+            title: "Google Sheets Export Failed",
+            description: `Failed to export attendance to Google Sheets: ${exportError.message}`,
+            variant: "destructive",
+          });
+        } else {
+          console.log("Google Sheets Export successful:", exportData);
+          toast({
+            title: "Google Sheets Exported",
+            description: "Attendance data has been exported to Google Sheets.",
+          });
+        }
+      } catch (exportInvokeError: any) {
+        console.error("Unexpected error during Edge Function invocation:", exportInvokeError);
+        toast({
+          title: "Google Sheets Export Failed",
+          description: `An unexpected error occurred during Google Sheets export: ${exportInvokeError.message}`,
+          variant: "destructive",
+        });
+      }
+      // --- End Edge Function Invocation ---
+
     } catch (error: any) {
       toast({
         title: "Error saving attendance",
@@ -334,7 +382,7 @@ const Attendance = () => {
             </div>
             {isSubmitDisabled && (
               <p className="text-destructive text-sm mt-2"> {/* Use destructive color */}
-                Attendance for Period {period} on ${date} has already been submitted by another faculty member. You cannot modify it.
+                Attendance for Period {period} on {date} has already been submitted by another faculty member. You cannot modify it.
               </p>
             )}
             {globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole === 'admin' && (

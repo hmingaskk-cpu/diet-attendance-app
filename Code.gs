@@ -1,39 +1,43 @@
 function doPost(e) {
-  var sheetId = '1vTRKT2u5FwkuYwAySq5iImj4P4jlo0GsXcdZzvsML-JOlluH3hbEj70TbTT3QyXKcRRXMxoCs2Kagg7'; // REPLACE WITH YOUR ACTUAL SPREADSHEET ID
-  var sheetName = 'AttendanceData'; // REPLACE WITH THE NAME OF THE SHEET TAB YOU WANT TO WRITE TO
-  var ss = SpreadsheetApp.openById(sheetId);
-  var sheet = ss.getSheetByName(sheetName);
+  const sheetId = "1vTRKT2u5FwkuYwAySq5iImj4P4jlo0GsXcdZzvsML-JOlluH3hbEj70TbTT3QyXKcRRXMxoCs2Kagg7"; // Replace with your actual Google Sheet ID
+  const sheetName = "AttendanceData"; // Name of the sheet tab where data will be written
 
+  const ss = SpreadsheetApp.openById(sheetId);
+  let sheet = ss.getSheetByName(sheetName);
+
+  // Create the sheet if it doesn't exist
   if (!sheet) {
-    return ContentService.createTextOutput(JSON.stringify({ error: 'Sheet not found: ' + sheetName }))
-      .setMimeType(ContentService.MimeType.JSON);
+    sheet = ss.insertSheet(sheetName);
   }
 
-  var data = JSON.parse(e.postData.contents);
+  const data = JSON.parse(e.postData.contents);
 
-  // Assuming data is an array of attendance records
-  // Each record should have properties like date, period, studentName, rollNumber, isPresent, semesterName
-  var rows = [];
-  for (var i = 0; i < data.length; i++) {
-    var record = data[i];
-    rows.push([
-      record.date,
-      record.period,
-      record.studentName,
-      record.rollNumber,
-      record.isPresent ? 'Present' : 'Absent',
-      record.semesterName,
-      new Date().toLocaleString() // Timestamp of export
+  // Define headers for your sheet
+  const headers = ["Date", "Period", "Semester Name", "Faculty Name", "Roll Number", "Student Name", "Status"];
+
+  // If the sheet is empty, add headers
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  }
+
+  // Append each student's attendance as a new row
+  data.studentsAttendance.forEach(student => {
+    sheet.appendRow([
+      data.date,
+      data.period,
+      data.semesterName,
+      data.facultyName,
+      student.roll_number,
+      student.name,
+      student.is_present ? "Present" : "Absent"
     ]);
-  }
+  });
 
-  // Add headers if the sheet is empty
-  if (sheet.getLastRow() == 0) {
-    sheet.appendRow(['Date', 'Period', 'Student Name', 'Roll Number', 'Status', 'Semester Name', 'Export Timestamp']);
-  }
-
-  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-
-  return ContentService.createTextOutput(JSON.stringify({ success: true, rowsAppended: rows.length }))
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Data exported to Google Sheet." }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  // This function is for testing GET requests, not used by the app.
+  return ContentService.createTextOutput("Please use POST requests to submit attendance data.");
 }
