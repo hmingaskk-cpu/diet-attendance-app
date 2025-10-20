@@ -10,8 +10,29 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log('Edge Function received request.');
+  console.log('Request headers:', req.headers);
+
+  let requestBody;
   try {
-    const { date, period, semesterName, facultyName, studentsAttendance } = await req.json();
+    requestBody = await req.json();
+    console.log('Parsed request body:', requestBody);
+  } catch (jsonError) {
+    console.error('Error parsing JSON body:', jsonError.message);
+    try {
+      const rawBody = await req.text();
+      console.error('Raw request body:', rawBody);
+    } catch (textError) {
+      console.error('Could not read raw request body:', textError.message);
+    }
+    return new Response(JSON.stringify({ error: 'Failed to parse request body as JSON. Ensure Content-Type is application/json and body is valid JSON.' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+
+  try {
+    const { date, period, semesterName, facultyName, studentsAttendance } = requestBody;
 
     const googleSheetsWebAppUrl = Deno.env.get('GOOGLE_SHEETS_WEB_APP_URL');
 
