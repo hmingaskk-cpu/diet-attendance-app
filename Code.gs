@@ -18,8 +18,8 @@ function createAndConfigureMonthlySpreadsheet(monthYearName) {
   Logger.log(`[createAndConfigureMonthlySpreadsheet] Attempting to create spreadsheet with name: "${monthYearName}"`);
   
   // Basic validation for the spreadsheet name
-  if (!monthYearName || monthYearName.trim() === '' || monthYearName === 'undefined') {
-    throw new Error(`Spreadsheet name cannot be empty, null, or 'undefined'. Received: "${monthYearName}"`);
+  if (typeof monthYearName !== 'string' || monthYearName.trim() === '' || monthYearName === 'undefined') {
+    throw new Error(`Spreadsheet name cannot be empty, null, or 'undefined'. Received: "${monthYearName}" (Type: ${typeof monthYearName})`);
   }
 
   // Check if a spreadsheet with this name already exists in Drive
@@ -55,16 +55,19 @@ function createAndConfigureMonthlySpreadsheet(monthYearName) {
  */
 function getOrCreateCurrentMonthSpreadsheetId() {
   const today = new Date();
+  // Explicitly use 'Asia/Kolkata' to ensure a valid timezone for formatting
+  const scriptTimeZone = 'Asia/Kolkata'; 
   
-  // Get script timezone, with a fallback to 'Asia/Kolkata' if it's not available or invalid
-  let scriptTimeZone = Session.getScriptTimeZone();
-  if (!scriptTimeZone || scriptTimeZone.trim() === '') {
-    Logger.log('[getOrCreateCurrentMonthSpreadsheetId] Session.getScriptTimeZone() returned empty or invalid. Falling back to "Asia/Kolkata".');
-    scriptTimeZone = 'Asia/Kolkata'; // A common timezone for the region
-  }
-  Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Using timezone: "${scriptTimeZone}"`);
+  Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Current Date object: ${today.toString()}`);
+  Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Using explicit timezone: "${scriptTimeZone}"`);
 
-  const monthYearName = Utilities.formatDate(today, scriptTimeZone, 'MMMM yyyy');
+  let monthYearName = Utilities.formatDate(today, scriptTimeZone, 'MMMM yyyy');
+  
+  // Final validation for monthYearName after formatting
+  if (typeof monthYearName !== 'string' || monthYearName.trim() === '' || monthYearName === 'undefined') {
+    throw new Error(`Failed to generate valid spreadsheet name. Formatted value: "${monthYearName}" (Type: ${typeof monthYearName})`);
+  }
+
   const currentMonthKey = `spreadsheetId_${monthYearName.replace(/\s/g, '_')}`; // Key for PropertiesService
   Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Generated monthYearName: "${monthYearName}", currentMonthKey: "${currentMonthKey}"`);
 
