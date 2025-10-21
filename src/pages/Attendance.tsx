@@ -37,6 +37,9 @@ const Attendance = () => {
   // Stores status for each period: 'taken-by-me', 'taken-by-other', or undefined
   const [globalPeriodStatuses, setGlobalPeriodStatuses] = useState<Record<number, 'taken-by-me' | 'taken-by-other' | undefined>>({});
 
+  // Define isCurrentDate here, accessible in JSX
+  const isCurrentDate = date === today;
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -172,7 +175,7 @@ const Attendance = () => {
 
     const currentPeriodNum = parseInt(period);
     const status = globalPeriodStatuses[currentPeriodNum];
-    const isCurrentDate = date === today; // Check if the selected date is today
+    // const isCurrentDate = date === today; // Removed local definition, using component-scoped one
 
     // If attendance is taken by another faculty and current user is NOT admin, prevent submission
     if (status === 'taken-by-other' && currentUserRole !== 'admin') {
@@ -489,16 +492,16 @@ const Attendance = () => {
             <AlertDialogTrigger asChild>
               <Button size="lg" disabled={isSubmitDisabled}>
                 <Save className="mr-2 h-4 w-4" />
-                {date === today ? "Submit Attendance" : "Update Attendance"}
+                {isCurrentDate ? "Submit Attendance" : "Update Attendance"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  {date === today ? "Confirm Attendance Submission" : "Confirm Attendance Update"}
+                  {isCurrentDate ? "Confirm Attendance Submission" : "Confirm Attendance Update"}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to {date === today ? "submit" : "update"} attendance for Period {period} on {date}?
+                  Are you sure you want to {isCurrentDate ? "submit" : "update"} attendance for Period {period} on {date}?
                   {globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole === 'admin' && (
                     <p className="text-orange-600 mt-2">
                       As an admin, this action will overwrite existing attendance data for this period.
@@ -514,7 +517,7 @@ const Attendance = () => {
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleSubmit}>
-                  {date === today ? "Confirm Submit" : "Confirm Update"}
+                  {isCurrentDate ? "Confirm Submit" : "Confirm Update"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
