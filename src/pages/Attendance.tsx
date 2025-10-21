@@ -26,7 +26,8 @@ const Attendance = () => {
   const [facultyName, setFacultyName] = useState("");
   const [facultyId, setFacultyId] = useState("");
   const [period, setPeriod] = useState("1");
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const today = new Date().toISOString().split('T')[0]; // Get current date once
+  const [date, setDate] = useState(today); // Initialize with current date
   const [selectAll, setSelectAll] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
   const [students, setStudents] = useState<Student[]>([]);
@@ -171,6 +172,7 @@ const Attendance = () => {
 
     const currentPeriodNum = parseInt(period);
     const status = globalPeriodStatuses[currentPeriodNum];
+    const isCurrentDate = date === today; // Check if the selected date is today
 
     // If attendance is taken by another faculty and current user is NOT admin, prevent submission
     if (status === 'taken-by-other' && currentUserRole !== 'admin') {
@@ -228,8 +230,8 @@ const Attendance = () => {
       if (insertError) throw insertError;
 
       toast({
-        title: "Attendance Submitted",
-        description: `Attendance for ${semesterName} (Period ${period}) has been saved.`,
+        title: isCurrentDate ? "Attendance Submitted" : "Attendance Updated",
+        description: `Attendance for ${semesterName} (Period ${period}) on ${date} has been ${isCurrentDate ? "saved" : "updated"}.`,
       });
 
       // Update global period status to 'taken-by-me' after successful submission
@@ -239,60 +241,62 @@ const Attendance = () => {
       }));
 
       // --- Invoke Edge Function for Google Sheets Export using direct fetch ---
-      try {
-        const studentsForExport = students.map(student => ({
-          name: student.name,
-          roll_number: student.roll_number,
-          is_present: attendance[student.id.toString()] ?? false,
-        }));
+      if (isCurrentDate) { // Only export if it's the current date
+        try {
+          const studentsForExport = students.map(student => ({
+            name: student.name,
+            roll_number: student.roll_number,
+            is_present: attendance[student.id.toString()] ?? false,
+          }));
 
-        const exportBody = {
-          date,
-          period: currentPeriodNum,
-          semesterName,
-          facultyName,
-          studentsAttendance: studentsForExport,
-        };
+          const exportBody = {
+            date,
+            period: currentPeriodNum,
+            semesterName,
+            facultyName,
+            studentsAttendance: studentsForExport,
+          };
 
-        console.log("Client-side: Sending body to Edge Function (direct fetch):", exportBody);
+          console.log("Client-side: Sending body to Edge Function (direct fetch):", exportBody);
 
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.access_token;
+          const { data: { session } } = await supabase.auth.getSession();
+          const accessToken = session?.access_token;
 
-        if (!accessToken) {
-          throw new Error("User not authenticated for Edge Function export.");
+          if (!accessToken) {
+            throw new Error("User not authenticated for Edge Function export.");
+          }
+
+          const edgeFunctionUrl = `https://ligxffklcdiosnitdqim.supabase.co/functions/v1/export-attendance-to-sheets`;
+
+          const response = await fetch(edgeFunctionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(exportBody),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Edge Function returned a non-2xx status: ${response.status} - ${errorText}`);
+          }
+
+          const result = await response.json();
+          console.log("Google Sheets Export successful:", result);
+          toast({
+            title: "Google Sheets Exported",
+            description: "Attendance data has been exported to Google Sheets.",
+          });
+          
+        } catch (exportInvokeError: any) {
+          console.error("Unexpected error during Edge Function invocation:", exportInvokeError);
+          toast({
+            title: "Google Sheets Export Failed",
+            description: `An unexpected error occurred during Google Sheets export: ${exportInvokeError.message}`,
+            variant: "destructive",
+          });
         }
-
-        const edgeFunctionUrl = `https://ligxffklcdiosnitdqim.supabase.co/functions/v1/export-attendance-to-sheets`;
-
-        const response = await fetch(edgeFunctionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(exportBody),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Edge Function returned a non-2xx status: ${response.status} - ${errorText}`);
-        }
-
-        const result = await response.json();
-        console.log("Google Sheets Export successful:", result);
-        toast({
-          title: "Google Sheets Exported",
-          description: "Attendance data has been exported to Google Sheets.",
-        });
-        
-      } catch (exportInvokeError: any) {
-        console.error("Unexpected error during Edge Function invocation:", exportInvokeError);
-        toast({
-          title: "Google Sheets Export Failed",
-          description: `An unexpected error occurred during Google Sheets export: ${exportInvokeError.message}`,
-          variant: "destructive",
-        });
       }
       // --- End Edge Function Invocation ---
 
@@ -485,24 +489,33 @@ const Attendance = () => {
             <AlertDialogTrigger asChild>
               <Button size="lg" disabled={isSubmitDisabled}>
                 <Save className="mr-2 h-4 w-4" />
-                Submit Attendance
+                {date === today ? "Submit Attendance" : "Update Attendance"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Attendance Submission</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {date === today ? "Confirm Attendance Submission" : "Confirm Attendance Update"}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to submit attendance for Period {period} on {date}?
+                  Are you sure you want to {date === today ? "submit" : "update"} attendance for Period {period} on {date}?
                   {globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole === 'admin' && (
                     <p className="text-orange-600 mt-2">
                       As an admin, this action will overwrite existing attendance data for this period.
+                    </p>
+                  )}
+                  {!isCurrentDate && (
+                    <p className="text-gray-500 mt-2">
+                      Note: Updating past attendance will not export data to Google Sheets.
                     </p>
                   )}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleSubmit}>Confirm Submit</AlertDialogAction>
+                <AlertDialogAction onClick={handleSubmit}>
+                  {date === today ? "Confirm Submit" : "Confirm Update"}
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
