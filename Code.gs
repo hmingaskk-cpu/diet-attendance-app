@@ -15,16 +15,23 @@ const SOURCE_SPREADSHEET_ID = 'YOUR_SOURCE_SPREADSHEET_ID_HERE';
  * @returns {string} The ID of the created or found spreadsheet.
  */
 function createAndConfigureMonthlySpreadsheet(monthYearName) {
+  Logger.log(`[createAndConfigureMonthlySpreadsheet] Attempting to create spreadsheet with name: "${monthYearName}"`);
+  
+  // Basic validation for the spreadsheet name
+  if (!monthYearName || monthYearName.trim() === '') {
+    throw new Error('Spreadsheet name cannot be empty or null.');
+  }
+
   // Check if a spreadsheet with this name already exists in Drive
   const files = DriveApp.getFilesByName(monthYearName);
   if (files.hasNext()) {
     const file = files.next();
-    Logger.log(`Found existing spreadsheet: ${monthYearName} (ID: ${file.getId()}). Using it.`);
+    Logger.log(`[createAndConfigureMonthlySpreadsheet] Found existing spreadsheet: ${monthYearName} (ID: ${file.getId()}). Using it.`);
     return file.getId();
   }
 
   // If not found, create a new spreadsheet
-  const ss = SpreadsheetApp.create(monthYearName);
+  const ss = SpreadsheetApp.create(monthYearName); // Line 19
   const spreadsheetId = ss.getId();
 
   // Rename the default Sheet1 to '1'
@@ -36,7 +43,7 @@ function createAndConfigureMonthlySpreadsheet(monthYearName) {
     ss.insertSheet(String(i));
   }
 
-  Logger.log(`Created new spreadsheet: ${monthYearName} (ID: ${spreadsheetId}) with 31 sheets.`);
+  Logger.log(`[createAndConfigureMonthlySpreadsheet] Created new spreadsheet: ${monthYearName} (ID: ${spreadsheetId}) with 31 sheets.`);
   return spreadsheetId;
 }
 
@@ -50,6 +57,7 @@ function getOrCreateCurrentMonthSpreadsheetId() {
   const today = new Date();
   const monthYearName = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MMMM yyyy');
   const currentMonthKey = `spreadsheetId_${monthYearName.replace(/\s/g, '_')}`; // Key for PropertiesService
+  Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Generated monthYearName: "${monthYearName}", currentMonthKey: "${currentMonthKey}"`);
 
   let spreadsheetId = PropertiesService.getUserProperties().getProperty(currentMonthKey);
 
@@ -77,7 +85,7 @@ function copyDataToDailySheet() {
 
     // If the target sheet for the current day doesn't exist, create it
     if (!targetSheet) {
-      Logger.log(`Target sheet '${sheetName}' not found in spreadsheet '${targetSpreadsheet.getName()}'. Creating it.`);
+      Logger.log(`[copyDataToDailySheet] Target sheet '${sheetName}' not found in spreadsheet '${targetSpreadsheet.getName()}'. Creating it.`);
       targetSheet = targetSpreadsheet.insertSheet(sheetName);
       // Optionally, reorder sheets if needed. For simplicity, new sheets are added at the end.
     }
@@ -101,9 +109,9 @@ function copyDataToDailySheet() {
 
     if (numRows1 > 0 && numCols1 > 0) {
       targetSheet.getRange(1, 1, numRows1, numCols1).setValues(values1);
-      Logger.log(`Copied ${numRows1} rows from Sheet1 to ${sheetName}.`);
+      Logger.log(`[copyDataToDailySheet] Copied ${numRows1} rows from Sheet1 to ${sheetName}.`);
     } else {
-      Logger.log('No data found in Source Sheet1 to copy.');
+      Logger.log('[copyDataToDailySheet] No data found in Source Sheet1 to copy.');
     }
 
     // Copy data from Sheet2, starting below the first pasted data
@@ -115,15 +123,15 @@ function copyDataToDailySheet() {
 
     if (numRows2 > 0 && numCols2 > 0) {
       targetSheet.getRange(lastRowAfterPaste1 + 1, 1, numRows2, numCols2).setValues(values2);
-      Logger.log(`Copied ${numRows2} rows from Sheet2 to ${sheetName}, starting at row ${lastRowAfterPaste1 + 1}.`);
+      Logger.log(`[copyDataToDailySheet] Copied ${numRows2} rows from Sheet2 to ${sheetName}, starting at row ${lastRowAfterPaste1 + 1}.`);
     } else {
-      Logger.log('No data found in Source Sheet2 to copy.');
+      Logger.log('[copyDataToDailySheet] No data found in Source Sheet2 to copy.');
     }
 
-    Logger.log(`Data copied successfully to sheet '${sheetName}' in '${targetSpreadsheet.getName()}'.`);
+    Logger.log(`[copyDataToDailySheet] Data copied successfully to sheet '${sheetName}' in '${targetSpreadsheet.getName()}'.`);
 
   } catch (e) {
-    Logger.log(`Error in copyDataToDailySheet: ${e.message}`);
+    Logger.log(`[copyDataToDailySheet] Error: ${e.message}`);
     throw e; // Re-throw to indicate failure
   }
 }
@@ -138,7 +146,7 @@ function dailyTriggerFunction() {
 
   // On the first day of the month, ensure the new spreadsheet is created/identified
   if (dayOfMonth === 1) {
-    Logger.log('It is the first day of the month. Ensuring monthly spreadsheet is ready.');
+    Logger.log('[dailyTriggerFunction] It is the first day of the month. Ensuring monthly spreadsheet is ready.');
     getOrCreateCurrentMonthSpreadsheetId(); // This will create if not exists and store ID
   }
 
