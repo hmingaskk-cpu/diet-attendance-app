@@ -61,14 +61,27 @@ function getOrCreateCurrentMonthSpreadsheetId() {
   Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Current Date object: ${today.toString()}`);
   Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Using explicit timezone: "${scriptTimeZone}"`);
 
-  let monthYearName = Utilities.formatDate(today, scriptTimeZone, 'MMMM yyyy');
+  // NEW: Check if Utilities and formatDate exist
+  if (typeof Utilities === 'undefined' || typeof Utilities.formatDate === 'undefined') {
+    throw new Error('Utilities.formatDate is not available. This indicates a critical Apps Script environment issue.');
+  }
+
+  let monthYearName;
+  try {
+    monthYearName = Utilities.formatDate(today, scriptTimeZone, 'MMMM yyyy');
+  } catch (e: any) {
+    Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Error during Utilities.formatDate: ${e.message}`);
+    throw new Error(`Failed to format date: ${e.message}`);
+  }
   
-  // Final validation for monthYearName after formatting
-  if (typeof monthYearName !== 'string' || monthYearName.trim() === '' || monthYearName === 'undefined') {
+  Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Result of Utilities.formatDate: "${monthYearName}" (Type: ${typeof monthYearName})`);
+
+  // More robust validation
+  if (monthYearName === null || monthYearName === undefined || typeof monthYearName !== 'string' || monthYearName.trim() === '') {
     throw new Error(`Failed to generate valid spreadsheet name. Formatted value: "${monthYearName}" (Type: ${typeof monthYearName})`);
   }
 
-  const currentMonthKey = `spreadsheetId_${monthYearName.replace(/\s/g, '_')}`; // Key for PropertiesService
+  const currentMonthKey = `spreadsheetId_${monthYearName.replace(/\s/g, '_')}`;
   Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Generated monthYearName: "${monthYearName}", currentMonthKey: "${currentMonthKey}"`);
 
   let spreadsheetId = PropertiesService.getUserProperties().getProperty(currentMonthKey);
@@ -142,7 +155,7 @@ function copyDataToDailySheet() {
 
     Logger.log(`[copyDataToDailySheet] Data copied successfully to sheet '${sheetName}' in '${targetSpreadsheet.getName()}'.`);
 
-  } catch (e) {
+  } catch (e: any) {
     Logger.log(`[copyDataToDailySheet] Error: ${e.message}`);
     throw e; // Re-throw to indicate failure
   }
