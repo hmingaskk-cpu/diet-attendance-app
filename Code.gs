@@ -18,8 +18,8 @@ function createAndConfigureMonthlySpreadsheet(monthYearName) {
   Logger.log(`[createAndConfigureMonthlySpreadsheet] Attempting to create spreadsheet with name: "${monthYearName}"`);
   
   // Basic validation for the spreadsheet name
-  if (!monthYearName || monthYearName.trim() === '') {
-    throw new Error('Spreadsheet name cannot be empty or null.');
+  if (!monthYearName || monthYearName.trim() === '' || monthYearName === 'undefined') {
+    throw new Error(`Spreadsheet name cannot be empty, null, or 'undefined'. Received: "${monthYearName}"`);
   }
 
   // Check if a spreadsheet with this name already exists in Drive
@@ -31,7 +31,7 @@ function createAndConfigureMonthlySpreadsheet(monthYearName) {
   }
 
   // If not found, create a new spreadsheet
-  const ss = SpreadsheetApp.create(monthYearName); // Line 19
+  const ss = SpreadsheetApp.create(monthYearName);
   const spreadsheetId = ss.getId();
 
   // Rename the default Sheet1 to '1'
@@ -55,7 +55,16 @@ function createAndConfigureMonthlySpreadsheet(monthYearName) {
  */
 function getOrCreateCurrentMonthSpreadsheetId() {
   const today = new Date();
-  const monthYearName = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MMMM yyyy');
+  
+  // Get script timezone, with a fallback to 'Asia/Kolkata' if it's not available or invalid
+  let scriptTimeZone = Session.getScriptTimeZone();
+  if (!scriptTimeZone || scriptTimeZone.trim() === '') {
+    Logger.log('[getOrCreateCurrentMonthSpreadsheetId] Session.getScriptTimeZone() returned empty or invalid. Falling back to "Asia/Kolkata".');
+    scriptTimeZone = 'Asia/Kolkata'; // A common timezone for the region
+  }
+  Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Using timezone: "${scriptTimeZone}"`);
+
+  const monthYearName = Utilities.formatDate(today, scriptTimeZone, 'MMMM yyyy');
   const currentMonthKey = `spreadsheetId_${monthYearName.replace(/\s/g, '_')}`; // Key for PropertiesService
   Logger.log(`[getOrCreateCurrentMonthSpreadsheetId] Generated monthYearName: "${monthYearName}", currentMonthKey: "${currentMonthKey}"`);
 
