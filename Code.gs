@@ -14,7 +14,7 @@ const SOURCE_SPREADSHEET_ID = 'YOUR_SOURCE_SPREADSHEET_ID_HERE';
  * @param {string} monthYearName The desired name for the spreadsheet (e.g., "September 2024").
  * @returns {string} The ID of the created or found spreadsheet.
  */
-function createAndConfigureMonthlySpreadsheet(monthYearName: string): string {
+function createAndConfigureMonthlySpreadsheet(monthYearName) {
   // Check if a spreadsheet with this name already exists in Drive
   const files = DriveApp.getFilesByName(monthYearName);
   if (files.hasNext()) {
@@ -46,7 +46,7 @@ function createAndConfigureMonthlySpreadsheet(monthYearName: string): string {
  * It stores the ID in User Properties for efficient retrieval on subsequent days.
  * @returns {string} The ID of the current month's spreadsheet.
  */
-function getOrCreateCurrentMonthSpreadsheetId(): string {
+function getOrCreateCurrentMonthSpreadsheetId() {
   const today = new Date();
   const monthYearName = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MMMM yyyy');
   const currentMonthKey = `spreadsheetId_${monthYearName.replace(/\s/g, '_')}`; // Key for PropertiesService
@@ -65,7 +65,7 @@ function getOrCreateCurrentMonthSpreadsheetId(): string {
  * Copies data from 'Sheet1' and 'Sheet2' of the source spreadsheet
  * to the sheet corresponding to the current day in the current month's spreadsheet.
  */
-function copyDataToDailySheet(): void {
+function copyDataToDailySheet() {
   const today = new Date();
   const dayOfMonth = today.getDate();
   const sheetName = String(dayOfMonth); // Target sheet name (e.g., "1", "2", ...)
@@ -122,7 +122,7 @@ function copyDataToDailySheet(): void {
 
     Logger.log(`Data copied successfully to sheet '${sheetName}' in '${targetSpreadsheet.getName()}'.`);
 
-  } catch (e: any) {
+  } catch (e) {
     Logger.log(`Error in copyDataToDailySheet: ${e.message}`);
     throw e; // Re-throw to indicate failure
   }
@@ -132,7 +132,7 @@ function copyDataToDailySheet(): void {
  * Main function to be called by a daily trigger.
  * It ensures the monthly spreadsheet is ready and copies data to the daily sheet.
  */
-function dailyTriggerFunction(): void {
+function dailyTriggerFunction() {
   const today = new Date();
   const dayOfMonth = today.getDate();
 
@@ -150,7 +150,7 @@ function dailyTriggerFunction(): void {
  * Sets up a daily time-driven trigger for `dailyTriggerFunction`.
  * This function should be run ONCE manually to initialize the trigger.
  */
-function setupDailyTrigger(): void {
+function setupDailyTrigger() {
   // Delete existing triggers for this function to prevent duplicates
   const triggers = ScriptApp.getProjectTriggers();
   for (const trigger of triggers) {
@@ -172,7 +172,7 @@ function setupDailyTrigger(): void {
  * Initialization function to be run ONCE manually.
  * It sets up the daily trigger and runs the daily function immediately.
  */
-function initialize(): void {
+function initialize() {
   setupDailyTrigger();
   dailyTriggerFunction(); // Run once immediately after setup
 }
