@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Save } from "lucide-react";
+import { Calendar, User, Save, Copy } from "lucide-react"; // Import Copy icon
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -36,6 +36,7 @@ const Attendance = () => {
   const [currentUserRole, setCurrentUserRole] = useState(""); // New state for current user's role
   // Stores status for each period: 'taken-by-me', 'taken-by-other', or undefined
   const [globalPeriodStatuses, setGlobalPeriodStatuses] = useState<Record<number, 'taken-by-me' | 'taken-by-other' | undefined>>({});
+  const [previousPeriodAttendance, setPreviousPeriodAttendance] = useState<Record<string, boolean>>({}); // New state for previous period's attendance
 
   // Define isCurrentDate here, accessible in JSX
   const isCurrentDate = date === today;
@@ -129,6 +130,31 @@ const Attendance = () => {
         
         setAttendance(initialAttendance);
 
+        // --- Fetch attendance for the previous period (if applicable) ---
+        const currentPeriodNum = parseInt(period);
+        if (currentPeriodNum > 1) {
+          const previousPeriodNum = currentPeriodNum - 1;
+          const { data: prevPeriodData, error: prevPeriodError } = await supabase
+            .from('attendance_records')
+            .select(`
+              student_id,
+              is_present
+            `)
+            .eq('date', date)
+            .eq('period', previousPeriodNum)
+            .eq('semester_id', id);
+          
+          if (prevPeriodError) throw prevPeriodError;
+
+          const prevAttendanceMap: Record<string, boolean> = {};
+          prevPeriodData?.forEach(record => {
+            prevAttendanceMap[record.student_id.toString()] = record.is_present;
+          });
+          setPreviousPeriodAttendance(prevAttendanceMap);
+        } else {
+          setPreviousPeriodAttendance({}); // Clear if on first period
+        }
+
       } catch (error: any) {
         toast({
           title: "Error loading data",
@@ -161,6 +187,28 @@ const Attendance = () => {
     }));
   };
 
+  const handleCopyFromPrevious = () => {
+    if (Object.keys(previousPeriodAttendance).length === 0) {
+      toast({
+        title: "No Previous Attendance",
+        description: `No attendance records found for Period ${parseInt(period) - 1} on ${date}.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setAttendance(previousPeriodAttendance);
+    
+    // Check if all students were present in the previous period to update selectAll checkbox
+    const allPresentInPrevious = students.every(student => previousPeriodAttendance[student.id.toString()] === true);
+    setSelectAll(allPresentInPrevious);
+
+    toast({
+      title: "Attendance Copied",
+      description: `Attendance copied from Period ${parseInt(period) - 1}.`,
+    });
+  };
+
   const handleSubmit = async () => {
     console.log("handleSubmit triggered!");
 
@@ -175,7 +223,7 @@ const Attendance = () => {
 
     const currentPeriodNum = parseInt(period);
     const status = globalPeriodStatuses[currentPeriodNum];
-    // const isCurrentDate = date === today; // Removed local definition, using component-scoped one
+    const isCurrentDate = date === today; // Check if the selected date is today
 
     // If attendance is taken by another faculty and current user is NOT admin, prevent submission
     if (status === 'taken-by-other' && currentUserRole !== 'admin') {
@@ -422,6 +470,16 @@ const Attendance = () => {
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2"> {/* Changed to flex-wrap gap-2 */}
+                {parseInt(period) > 1 && (
+                  <Button
+                    variant="outline"
+                    onClick={handleCopyFromPrevious}
+                    disabled={isSubmitDisabled || Object.keys(previousPeriodAttendance).length === 0}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy from Period {parseInt(period) - 1}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(true)}
