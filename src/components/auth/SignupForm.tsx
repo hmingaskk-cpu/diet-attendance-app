@@ -82,7 +82,7 @@ const SignupForm = () => {
           name: values.name,
           email: values.email,
           role: values.role,
-          // Removed explicit status: 'pending' to rely on database default
+          status: 'pending', // Explicitly setting status to 'pending'
         });
 
       if (profileError) {
