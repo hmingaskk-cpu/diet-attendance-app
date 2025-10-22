@@ -16,8 +16,8 @@ export interface Database {
           updated_at: string
           name: string
           email: string
-          role: string
-          status: string
+          role: "admin" | "faculty" // Updated to ENUM type
+          status: "pending" | "active" | "inactive" // Updated to ENUM type
         }
         Insert: {
           id: string
@@ -25,8 +25,8 @@ export interface Database {
           updated_at?: string
           name: string
           email: string
-          role: string
-          status?: string
+          role: "admin" | "faculty" // Updated to ENUM type
+          status?: "pending" | "active" | "inactive" // Updated to ENUM type
         }
         Update: {
           id?: string
@@ -34,8 +34,8 @@ export interface Database {
           updated_at?: string
           name?: string
           email?: string
-          role?: string
-          status?: string
+          role?: "admin" | "faculty" // Updated to ENUM type
+          status?: "pending" | "active" | "inactive" // Updated to ENUM type
         }
         Relationships: [
           {
@@ -161,7 +161,8 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_status_enum: ["pending", "active", "inactive"]
+      user_role_enum: ["admin", "faculty"]
     }
     CompositeTypes: {
       [_ in never]: never
