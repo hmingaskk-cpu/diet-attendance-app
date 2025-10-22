@@ -60,35 +60,54 @@ const SignupForm = () => {
   const onSubmit = async (values: SignupFormValues) => {
     setIsLoading(true);
     
-    // First, sign up the user
-    const { data, error } = await supabase.auth.signUp({
+    // First, sign up the user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
-      options: {
-        data: {
-          name: values.name,
-          role: values.role
-        }
-      }
+      // We no longer pass 'data' options here, as the public.users table is populated manually
     });
     
-    if (error) {
+    if (authError) {
       toast({
         title: "Signup Failed",
-        description: error.message,
+        description: authError.message,
         variant: "destructive"
       });
-    } else {
-      toast({
-        title: "Account Created",
-        description: "Your account is pending admin approval. You will be able to log in once approved.",
-        duration: 5000, // Give user more time to read this important message
-      });
-      
-      // Redirect to login page after a short delay
-      setTimeout(() => {
-        navigate("/login");
-      }, 3000); // Increased delay for better UX
+    } else if (authData.user) {
+      // If authentication signup is successful, manually insert into public.users table
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          name: values.name,
+          email: values.email,
+          role: values.role,
+          status: 'pending', // Always set to pending initially
+        });
+
+      if (profileError) {
+        // If profile insertion fails, we should ideally also roll back the auth user,
+        // but for simplicity, we'll just report the error. Admin can clean up.
+        toast({
+          title: "Profile Creation Failed",
+          description: `Account created, but failed to save user profile: ${profileError.message}. Please contact support.`,
+          variant: "destructive",
+          duration: 7000,
+        });
+        // Optionally, log out the user if profile creation failed
+        await supabase.auth.signOut();
+      } else {
+        toast({
+          title: "Account Created",
+          description: "Your account is pending admin approval. You will be able to log in once approved.",
+          duration: 5000, // Give user more time to read this important message
+        });
+        
+        // Redirect to login page after a short delay
+        setTimeout(() => {
+          navigate("/login");
+        }, 3000); // Increased delay for better UX
+      }
     }
     
     setIsLoading(false);
