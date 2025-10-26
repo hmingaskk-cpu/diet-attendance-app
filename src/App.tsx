@@ -17,7 +17,8 @@ import UpdatePassword from "./pages/UpdatePassword";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
-import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
+import LoadingSkeleton from "@/components/LoadingSkeleton";
+import Layout from "@/components/Layout"; // Import Layout component
 
 const queryClient = new QueryClient();
 
@@ -75,7 +76,9 @@ const AuthenticatedApp = () => {
         path="/dashboard" 
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <Layout>
+              <Dashboard />
+            </Layout>
           </ProtectedRoute>
         } 
       />
@@ -83,7 +86,9 @@ const AuthenticatedApp = () => {
         path="/attendance/:id" 
         element={
           <ProtectedRoute>
-            <Attendance />
+            <Layout>
+              <Attendance />
+            </Layout>
           </ProtectedRoute>
         } 
       />
@@ -91,7 +96,9 @@ const AuthenticatedApp = () => {
         path="/reports" 
         element={
           <ProtectedRoute>
-            <Reports />
+            <Layout>
+              <Reports />
+            </Layout>
           </ProtectedRoute>
         } 
       />
@@ -99,7 +106,9 @@ const AuthenticatedApp = () => {
         path="/students" 
         element={
           <ProtectedRoute>
-            <Students />
+            <Layout>
+              <Students />
+            </Layout>
           </ProtectedRoute>
         } 
       />
@@ -107,12 +116,14 @@ const AuthenticatedApp = () => {
         path="/faculty" 
         element={
           <ProtectedRoute>
-            <Faculty />
+            <Layout>
+              <Faculty />
+            </Layout>
           </ProtectedRoute>
         } 
       />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      <Route path="*" element={<NotFound />} />
+      <Route path="*" element={<Layout><NotFound /></Layout>} /> {/* NotFound also uses Layout */}
     </Routes>
   );
 };
