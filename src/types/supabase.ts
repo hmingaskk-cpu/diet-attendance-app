@@ -18,6 +18,7 @@ export interface Database {
           email: string
           role: "admin" | "faculty" // Updated to ENUM type
           status: "pending" | "active" | "inactive" // Updated to ENUM type
+          abbreviation: string | null // Added abbreviation column
         }
         Insert: {
           id: string
@@ -27,6 +28,7 @@ export interface Database {
           email: string
           role: "admin" | "faculty" // Updated to ENUM type
           status?: "pending" | "active" | "inactive" // Updated to ENUM type
+          abbreviation?: string | null // Added abbreviation column
         }
         Update: {
           id?: string
@@ -36,6 +38,7 @@ export interface Database {
           email?: string
           role?: "admin" | "faculty" // Updated to ENUM type
           status?: "pending" | "active" | "inactive" // Updated to ENUM type
+          abbreviation?: string | null // Added abbreviation column
         }
         Relationships: [
           {

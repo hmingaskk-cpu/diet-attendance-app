@@ -34,8 +34,8 @@ const Attendance = () => {
   const [semesterName, setSemesterName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState(""); // New state for current user's role
-  // Stores status for each period: 'taken-by-me', 'taken-by-other', or undefined
-  const [globalPeriodStatuses, setGlobalPeriodStatuses] = useState<Record<number, 'taken-by-me' | 'taken-by-other' | undefined>>({});
+  // Stores status for each period: { status: 'taken-by-me' | 'taken-by-other', abbreviation?: string }
+  const [globalPeriodStatuses, setGlobalPeriodStatuses] = useState<Record<number, { status: 'taken-by-me' | 'taken-by-other' | undefined; abbreviation?: string | null }>>({});
   const [previousPeriodAttendance, setPreviousPeriodAttendance] = useState<Record<string, boolean>>({}); // New state for previous period's attendance
 
   // Define isCurrentDate here, accessible in JSX
@@ -88,20 +88,26 @@ const Attendance = () => {
         setStudents(studentsData || []);
         
         // --- New Logic: Check global attendance status for all periods today ---
+        // Fetch all attendance records for the selected date and semester, including faculty abbreviation
         const { data: allAttendanceToday, error: allAttendanceError } = await supabase
           .from('attendance_records')
-          .select('period, faculty_id')
+          .select(`
+            period,
+            faculty_id,
+            faculty:users (abbreviation)
+          `)
           .eq('date', date)
           .eq('semester_id', id);
         
         if (allAttendanceError) throw allAttendanceError;
         
-        const newGlobalPeriodStatuses: Record<number, 'taken-by-me' | 'taken-by-other' | undefined> = {};
+        const newGlobalPeriodStatuses: Record<number, { status: 'taken-by-me' | 'taken-by-other' | undefined; abbreviation?: string | null }> = {};
         allAttendanceToday?.forEach(record => {
+          const abbreviation = (record.faculty as { abbreviation: string | null })?.abbreviation;
           if (record.faculty_id === user.id) {
-            newGlobalPeriodStatuses[record.period] = 'taken-by-me';
+            newGlobalPeriodStatuses[record.period] = { status: 'taken-by-me', abbreviation };
           } else {
-            newGlobalPeriodStatuses[record.period] = 'taken-by-other';
+            newGlobalPeriodStatuses[record.period] = { status: 'taken-by-other', abbreviation };
           }
         });
         setGlobalPeriodStatuses(newGlobalPeriodStatuses);
@@ -222,11 +228,11 @@ const Attendance = () => {
     }
 
     const currentPeriodNum = parseInt(period);
-    const status = globalPeriodStatuses[currentPeriodNum];
+    const periodStatus = globalPeriodStatuses[currentPeriodNum];
     const isCurrentDate = date === today; // Check if the selected date is today
 
     // If attendance is taken by another faculty and current user is NOT admin, prevent submission
-    if (status === 'taken-by-other' && currentUserRole !== 'admin') {
+    if (periodStatus?.status === 'taken-by-other' && currentUserRole !== 'admin') {
       toast({
         title: "Attendance Already Taken",
         description: `Attendance for Period ${period} on ${date} has already been submitted by another faculty member. You cannot modify it.`,
@@ -237,7 +243,7 @@ const Attendance = () => {
 
     try {
       // If attendance was taken by another faculty and current user IS admin, warn them
-      if (status === 'taken-by-other' && currentUserRole === 'admin') {
+      if (periodStatus?.status === 'taken-by-other' && currentUserRole === 'admin') {
         toast({
           title: "Overwriting Attendance",
           description: `You are overwriting attendance for Period ${period} on ${date} previously submitted by another faculty.`,
@@ -286,9 +292,18 @@ const Attendance = () => {
       });
 
       // Update global period status to 'taken-by-me' after successful submission
+      // We need to fetch the current user's abbreviation to update the status correctly
+      const { data: currentUserDetails, error: currentUserDetailsError } = await supabase
+        .from('users')
+        .select('abbreviation')
+        .eq('id', facultyId)
+        .single();
+
+      if (currentUserDetailsError) throw currentUserDetailsError;
+
       setGlobalPeriodStatuses(prev => ({
         ...prev,
-        [currentPeriodNum]: 'taken-by-me'
+        [currentPeriodNum]: { status: 'taken-by-me', abbreviation: currentUserDetails?.abbreviation }
       }));
 
       // --- Invoke Edge Function for Google Sheets Export using direct fetch ---
@@ -361,7 +376,7 @@ const Attendance = () => {
   };
 
   // Disable submission only if it's taken by another faculty AND the current user is NOT an admin
-  const isSubmitDisabled = globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole !== 'admin';
+  const isSubmitDisabled = globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole !== 'admin';
 
   if (isLoading) {
     return (
@@ -418,18 +433,29 @@ const Attendance = () => {
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>
-                    {[1, 2, 3, 4, 5, 6].map((p) => (
-                      <SelectItem 
-                        key={p} 
-                        value={p.toString()}
-                        className={
-                          globalPeriodStatuses[p] === 'taken-by-me' ? "text-primary font-medium" : // Use primary color
-                          globalPeriodStatuses[p] === 'taken-by-other' ? "text-destructive font-medium" : "" // Use destructive color
-                        }
-                      >
-                        Period {p} {globalPeriodStatuses[p] === 'taken-by-me' ? "(Taken by you)" : globalPeriodStatuses[p] === 'taken-by-other' ? "(Taken by other)" : ""}
-                      </SelectItem>
-                    ))}
+                    {[1, 2, 3, 4, 5, 6].map((p) => {
+                      const statusInfo = globalPeriodStatuses[p];
+                      let itemClassName = "";
+                      let statusText = "";
+
+                      if (statusInfo?.status === 'taken-by-me') {
+                        itemClassName = "text-primary font-medium";
+                        statusText = "(Taken by you)";
+                      } else if (statusInfo?.status === 'taken-by-other') {
+                        itemClassName = "text-destructive font-medium";
+                        statusText = statusInfo.abbreviation ? `(Taken by ${statusInfo.abbreviation})` : "(Taken by other)";
+                      }
+
+                      return (
+                        <SelectItem 
+                          key={p} 
+                          value={p.toString()}
+                          className={itemClassName}
+                        >
+                          Period {p} {statusText}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -452,7 +478,7 @@ const Attendance = () => {
                 Attendance for Period {period} on {date} has already been submitted by another faculty member. You cannot modify it.
               </p>
             )}
-            {globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole === 'admin' && (
+            {globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole === 'admin' && (
               <p className="text-orange-600 text-sm mt-2">
                 As an admin, you can overwrite this attendance record. Submitting will replace the existing data.
               </p>
@@ -560,7 +586,7 @@ const Attendance = () => {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   Are you sure you want to {isCurrentDate ? "submit" : "update"} attendance for Period {period} on {date}?
-                  {globalPeriodStatuses[parseInt(period)] === 'taken-by-other' && currentUserRole === 'admin' && (
+                  {globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole === 'admin' && (
                     <p className="text-orange-600 mt-2">
                       As an admin, this action will overwrite existing attendance data for this period.
                     </p>

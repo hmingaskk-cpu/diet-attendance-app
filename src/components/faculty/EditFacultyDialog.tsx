@@ -38,6 +38,11 @@ const editFacultyFormSchema = z.object({
   status: z.enum(["active", "inactive", "pending"], {
     message: "Please select a valid status.",
   }),
+  abbreviation: z.string().min(1, {
+    message: "Abbreviation is required.",
+  }).max(5, { // Allowing a bit more flexibility than 3, but keeping it short
+    message: "Abbreviation must not be longer than 5 characters.",
+  }),
   newPassword: z.string().min(6, {
     message: "Password must be at least 6 characters.",
   }).optional().or(z.literal("")),
@@ -63,6 +68,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
       email: "",
       role: "faculty",
       status: "active",
+      abbreviation: "",
       newPassword: "",
     },
   });
@@ -80,6 +86,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
         email: facultyMember.email,
         role: initialRole as "faculty" | "admin",
         status: initialStatus as "active" | "inactive" | "pending",
+        abbreviation: facultyMember.abbreviation || "", // Set abbreviation
         newPassword: "",
       });
     }
@@ -99,6 +106,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
           email: values.email,
           role: values.role,
           status: values.status,
+          abbreviation: values.abbreviation, // Update abbreviation
           updated_at: new Date().toISOString(),
         })
         .eq('id', facultyMember.id);
@@ -234,6 +242,25 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
                         <SelectItem value="pending">Pending</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="abbreviation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Abbreviation</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="LHM"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      A 3-letter abbreviation for this faculty member (e.g., LHM for Lalhmingmawia).
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -11,7 +11,7 @@ export type AttendanceRecord = Database['public']['Tables']['attendance_records'
 export const getUsers = async () => {
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select('*, abbreviation') // Select abbreviation
     .order('name')
   
   if (error) throw error
@@ -21,7 +21,7 @@ export const getUsers = async () => {
 export const getUserById = async (id: string) => {
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select('*, abbreviation') // Select abbreviation
     .eq('id', id)
     .single()
   
