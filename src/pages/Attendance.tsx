@@ -113,9 +113,8 @@ const Attendance = () => {
         setGlobalPeriodStatuses(newGlobalPeriodStatuses);
         // --- End New Logic ---
 
-        // Get existing attendance records for the CURRENTLY SELECTED period by THIS faculty
-        // Admins can see all records, but only their own are pre-filled for editing
-        const { data: attendanceData, error: attendanceError } = await supabase
+        // Get existing attendance records for the CURRENTLY SELECTED period
+        let attendanceQuery = supabase
           .from('attendance_records')
           .select(`
             student_id,
@@ -123,8 +122,19 @@ const Attendance = () => {
           `)
           .eq('date', date)
           .eq('period', period)
-          .eq('semester_id', id)
-          .eq('faculty_id', user.id); // Filter by current faculty ID to pre-fill only their own records
+          .eq('semester_id', id);
+
+        const currentPeriodNum = parseInt(period);
+        const periodStatus = newGlobalPeriodStatuses[currentPeriodNum]; // Use the newly fetched statuses
+
+        // If the current user is an admin AND the period was taken by someone else,
+        // we should load ALL records for that period, not just the admin's.
+        // Otherwise, load only records taken by the current user (or if no one took it yet).
+        if (!(currentUserRole === 'admin' && periodStatus?.status === 'taken-by-other')) {
+          attendanceQuery = attendanceQuery.eq('faculty_id', user.id);
+        }
+        
+        const { data: attendanceData, error: attendanceError } = await attendanceQuery;
         
         if (attendanceError) throw attendanceError;
         
@@ -137,7 +147,6 @@ const Attendance = () => {
         setAttendance(initialAttendance);
 
         // --- Fetch attendance for the previous period (if applicable) ---
-        const currentPeriodNum = parseInt(period);
         if (currentPeriodNum > 1) {
           const previousPeriodNum = currentPeriodNum - 1;
           const { data: prevPeriodData, error: prevPeriodError } = await supabase
@@ -175,7 +184,7 @@ const Attendance = () => {
     if (id) {
       fetchData();
     }
-  }, [id, date, period, navigate, toast]);
+  }, [id, date, period, navigate, toast, currentUserRole]); // Added currentUserRole to dependencies
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
