@@ -18,6 +18,7 @@ const ViewFacultyDialog = ({ isOpen, onClose, facultyMember }: ViewFacultyDialog
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
+        {isOpen && console.log("ViewFacultyDialog is rendering content.")} {/* Added log */}
         <DialogHeader>
           <DialogTitle>Faculty Member Details</DialogTitle>
           <DialogDescription>

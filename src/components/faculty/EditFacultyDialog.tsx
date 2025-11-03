@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { User } from "@/lib/db";
+import { User } from "@/lib/db"; // Ensure User type is correctly imported
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,7 +53,7 @@ type EditFacultyFormValues = z.infer<typeof editFacultyFormSchema>;
 interface EditFacultyDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  facultyMember: User | null;
+  facultyMember: User | null; // Corrected type from Student to User
   onFacultyUpdated: () => void;
 }
 
@@ -161,6 +161,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
+        {isOpen && console.log("EditFacultyDialog is rendering content.")} {/* Added log */}
         <DialogHeader>
           <DialogTitle>Edit Faculty Member</DialogTitle>
           <DialogDescription>
