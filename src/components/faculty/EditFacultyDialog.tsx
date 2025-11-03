@@ -160,7 +160,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       {console.log("EditFacultyDialog: Dialog component is mounted. Open state:", isOpen)}
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         {isOpen && console.log("EditFacultyDialog: DialogContent is rendering.")}
         <DialogHeader>
           <DialogTitle>Edit Faculty Member</DialogTitle>
@@ -287,7 +287,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
                 )}
               />
             </div>
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save Changes"}
               </Button>

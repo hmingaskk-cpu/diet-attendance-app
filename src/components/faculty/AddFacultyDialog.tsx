@@ -100,7 +100,7 @@ const AddFacultyDialog = ({ isOpen, onClose, onFacultyAdded }: AddFacultyDialogP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Faculty Member</DialogTitle>
           <DialogDescription>
@@ -181,7 +181,7 @@ const AddFacultyDialog = ({ isOpen, onClose, onFacultyAdded }: AddFacultyDialogP
                 )}
               />
             </div>
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Adding..." : "Add Faculty"}
               </Button>

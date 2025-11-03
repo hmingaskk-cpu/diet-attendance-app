@@ -1,10 +1,10 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Added DialogFooter import
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button"; // Import Button for DialogFooter
+import { Button } from "@/components/ui/button";
 import { User } from "@/lib/db";
 
 interface ViewFacultyDialogProps {
@@ -24,7 +24,7 @@ const ViewFacultyDialog = ({ isOpen, onClose, facultyMember }: ViewFacultyDialog
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       {console.log("ViewFacultyDialog: Dialog component is mounted. Open state:", isOpen)}
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         {isOpen && console.log("ViewFacultyDialog: DialogContent is rendering.")}
         <DialogHeader>
           <DialogTitle>Faculty Member Details</DialogTitle>
@@ -78,7 +78,7 @@ const ViewFacultyDialog = ({ isOpen, onClose, facultyMember }: ViewFacultyDialog
             <Input id="updatedAt" value={new Date(facultyMember.updated_at).toLocaleString()} readOnly className="col-span-3" />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
           <Button onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
