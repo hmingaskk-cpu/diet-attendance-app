@@ -18,7 +18,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
-import Layout from "@/components/Layout"; // Import Layout component
 
 const queryClient = new QueryClient();
 
@@ -76,9 +75,7 @@ const AuthenticatedApp = () => {
         path="/dashboard" 
         element={
           <ProtectedRoute>
-            <Layout>
-              <Dashboard />
-            </Layout>
+            <Dashboard />
           </ProtectedRoute>
         } 
       />
@@ -86,9 +83,7 @@ const AuthenticatedApp = () => {
         path="/attendance/:id" 
         element={
           <ProtectedRoute>
-            <Layout>
-              <Attendance />
-            </Layout>
+            <Attendance />
           </ProtectedRoute>
         } 
       />
@@ -96,9 +91,7 @@ const AuthenticatedApp = () => {
         path="/reports" 
         element={
           <ProtectedRoute>
-            <Layout>
-              <Reports />
-            </Layout>
+            <Reports />
           </ProtectedRoute>
         } 
       />
@@ -106,9 +99,7 @@ const AuthenticatedApp = () => {
         path="/students" 
         element={
           <ProtectedRoute>
-            <Layout>
-              <Students />
-            </Layout>
+            <Students />
           </ProtectedRoute>
         } 
       />
@@ -116,14 +107,12 @@ const AuthenticatedApp = () => {
         path="/faculty" 
         element={
           <ProtectedRoute>
-            <Layout>
-              <Faculty />
-            </Layout>
+            <Faculty />
           </ProtectedRoute>
         } 
       />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      <Route path="*" element={<Layout><NotFound /></Layout>} /> {/* NotFound also uses Layout */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
