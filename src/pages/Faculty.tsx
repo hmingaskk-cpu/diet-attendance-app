@@ -17,7 +17,7 @@ import EditFacultyDialog from "@/components/faculty/EditFacultyDialog";
 import ViewFacultyDialog from "@/components/faculty/ViewFacultyDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"; // Import Dialog components
+// Removed Dialog components import as the test dialog is removed
 
 const Faculty = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -334,22 +334,6 @@ const Faculty = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* TEST DIALOG - ALWAYS OPEN */}
-      <Dialog open={true}>
-        <DialogContent className="sm:max-w-[425px]">
-          {console.log("TEST DIALOG: DialogContent is rendering!")}
-          <DialogHeader>
-            <DialogTitle>Test Dialog</DialogTitle>
-            <DialogDescription>
-              This dialog should always be visible.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="p-4 bg-green-100">
-            <p>If you see this, the Dialog component is working!</p>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <AddFacultyDialog 
         isOpen={isAddFacultyDialogOpen} 

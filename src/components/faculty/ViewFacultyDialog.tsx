@@ -24,59 +24,21 @@ const ViewFacultyDialog = ({ isOpen, onClose, facultyMember }: ViewFacultyDialog
     <Dialog open={isOpen} onOpenChange={onClose}>
       {console.log("ViewFacultyDialog: Dialog component is mounted. Open state:", isOpen)}
       <DialogContent className="sm:max-w-[425px]">
-        {isOpen && console.log("ViewFacultyDialog: DialogContent is rendering.")}
+        {isOpen && console.log("ViewFacultyDialog: DialogContent is rendering!")}
         <DialogHeader>
-          <DialogTitle>Faculty Member Details</DialogTitle>
+          <DialogTitle>View Faculty Member (DEBUG)</DialogTitle>
           <DialogDescription>
-            Viewing details for {facultyMember.name}.
+            This is a simplified debug version of the View Faculty Dialog.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              Name
-            </Label>
-            <Input id="name" value={facultyMember.name} readOnly className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="email" className="text-right">
-              Email
-            </Label>
-            <Input id="email" value={facultyMember.email} readOnly className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="role" className="text-right">
-              Role
-            </Label>
-            <div className="col-span-3">
-              <Badge variant={facultyMember.role === "admin" ? "default" : "secondary"}>
-                {facultyMember.role}
-              </Badge>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="status" className="text-right">
-              Status
-            </Label>
-            <div className="col-span-3">
-              <Badge variant={facultyMember.status === "active" ? "default" : "destructive"}>
-                {facultyMember.status}
-              </Badge>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="createdAt" className="text-right">
-              Created At
-            </Label>
-            <Input id="createdAt" value={new Date(facultyMember.created_at).toLocaleString()} readOnly className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="updatedAt" className="text-right">
-              Last Updated
-            </Label>
-            <Input id="updatedAt" value={new Date(facultyMember.updated_at).toLocaleString()} readOnly className="col-span-3" />
-          </div>
+        <div className="grid gap-4 py-4 bg-green-100">
+          <p>If you see this, the View Dialog content is rendering!</p>
+          <p>Name: {facultyMember.name}</p>
+          <p>Email: {facultyMember.email}</p>
         </div>
+        <DialogFooter>
+          <Button onClick={onClose}>Close Debug Dialog</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
