@@ -16,7 +16,7 @@ const Dashboard = () => {
   const [semesters, setSemesters] = useState<any[]>([]);
   const [studentCounts, setStudentCounts] = useState<Record<number, number>>({});
   const [todayAttendanceCount, setTodayAttendanceCount] = useState(0);
-  const [reportCount, setReportCount] = useState(0);
+  const [monthlyAttendanceEntriesCount, setMonthlyAttendanceEntriesCount] = useState(0); // Renamed from reportCount
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true); // Add isLoading state
 
@@ -61,29 +61,27 @@ const Dashboard = () => {
           }
           setStudentCounts(counts);
           
-          // Get today's attendance count
+          // Get today's attendance count (system-wide)
           const today = new Date().toISOString().split('T')[0];
           const { count: attendanceCount, error: attendanceError } = await supabase
             .from('attendance_records')
             .select('*', { count: 'exact', head: true })
-            .eq('date', today)
-            .eq('faculty_id', user.id);
+            .eq('date', today); // Removed faculty_id filter
           
           if (attendanceError) throw attendanceError;
           setTodayAttendanceCount(attendanceCount || 0);
           
-          // Get this month's report count
+          // Get this month's attendance entries count (system-wide)
           const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
             .toISOString().split('T')[0];
           
-          const { count: reportCount, error: reportError } = await supabase
+          const { count: monthlyCount, error: monthlyError } = await supabase
             .from('attendance_records')
             .select('*', { count: 'exact', head: true })
-            .gte('created_at', firstDayOfMonth)
-            .eq('faculty_id', user.id);
+            .gte('created_at', firstDayOfMonth); // Removed faculty_id filter
           
-          if (reportError) throw reportError;
-          setReportCount(reportCount || 0);
+          if (monthlyError) throw monthlyError;
+          setMonthlyAttendanceEntriesCount(monthlyCount || 0); // Updated state variable
         }
       } catch (error: any) {
         toast({
@@ -224,12 +222,12 @@ const Dashboard = () => {
           </Card>
           <Card className="shadow-sm rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Reports Generated</CardTitle>
+              <CardTitle className="text-sm font-medium">Attendance Entries This Month</CardTitle> {/* Updated title */}
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reportCount}</div>
-              <p className="text-xs text-muted-foreground">This month</p>
+              <div className="text-2xl font-bold">{monthlyAttendanceEntriesCount}</div> {/* Updated state variable */}
+              <p className="text-xs text-muted-foreground">Total entries</p>
             </CardContent>
           </Card>
         </div>
