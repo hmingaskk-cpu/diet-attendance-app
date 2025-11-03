@@ -121,12 +121,12 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
         }
 
         // Call the Edge Function to update the password
+        // Pass a plain object for the body, supabase.functions.invoke will stringify it
         const { data: passwordUpdateData, error: passwordUpdateError } = await supabase.functions.invoke(
           'admin-update-user-password',
           {
-            body: JSON.stringify({ userId: facultyMember.id, newPassword: values.newPassword }),
+            body: { userId: facultyMember.id, newPassword: values.newPassword }, // Corrected: pass plain object
             headers: {
-              'Content-Type': 'application/json',
               'Authorization': `Bearer ${user.access_token}`,
             },
           }
