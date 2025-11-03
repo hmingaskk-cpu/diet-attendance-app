@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Save, Copy } from "lucide-react"; // Import Copy icon
+import { Calendar, User, Save, Copy, Trash2 } from "lucide-react"; // Import Copy and Trash2 icons
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { Student, AttendanceRecord } from "@/lib/db";
@@ -382,8 +382,68 @@ const Attendance = () => {
     }
   };
 
+  const handleDeleteAttendance = async () => {
+    if (!facultyId) {
+      toast({
+        title: "Authentication Error",
+        description: "Faculty ID not found. Please log in again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      let deleteQuery = supabase
+        .from('attendance_records')
+        .delete()
+        .eq('date', date)
+        .eq('period', period)
+        .eq('semester_id', id);
+
+      // If not admin, restrict deletion to their own records.
+      // RLS will also enforce this, but it's good practice to filter client-side.
+      if (currentUserRole !== 'admin') {
+        deleteQuery = deleteQuery.eq('faculty_id', facultyId);
+      }
+
+      const { error } = await deleteQuery;
+
+      if (error) throw error;
+
+      toast({
+        title: "Attendance Deleted",
+        description: `Attendance for Period ${period} on ${date} has been deleted.`,
+      });
+
+      // Clear attendance state and update global period status
+      setAttendance({});
+      setSelectAll(false); // Reset select all checkbox
+      setGlobalPeriodStatuses(prev => {
+        const newState = { ...prev };
+        delete newState[parseInt(period)]; // Remove the status for the deleted period
+        return newState;
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Error deleting attendance",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Disable submission only if it's taken by another faculty AND the current user is NOT an admin
   const isSubmitDisabled = globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole !== 'admin';
+
+  // Disable delete button if no attendance is taken for this period,
+  // OR if it's taken by another faculty and current user is NOT admin.
+  const currentPeriodStatus = globalPeriodStatuses[parseInt(period)];
+  const isDeleteDisabled = !currentPeriodStatus || (currentPeriodStatus.status === 'taken-by-other' && currentUserRole !== 'admin');
+
 
   if (isLoading) {
     return (
@@ -575,7 +635,35 @@ const Attendance = () => {
           </CardContent>
         </Card>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex justify-end space-x-2"> {/* Added space-x-2 for spacing between buttons */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={isDeleteDisabled}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Attendance
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete attendance for Period {period} on {date}? This action cannot be undone.
+                  {currentPeriodStatus?.status === 'taken-by-other' && currentUserRole === 'admin' && (
+                    <p className="text-orange-600 mt-2">
+                      As an admin, this will permanently delete the attendance record for this period, even if taken by another faculty.
+                    </p>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAttendance}>
+                  Confirm Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button size="lg" disabled={isSubmitDisabled}>
