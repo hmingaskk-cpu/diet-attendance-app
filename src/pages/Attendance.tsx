@@ -635,7 +635,7 @@ const Attendance = () => {
           </CardContent>
         </Card>
 
-        <div className="mt-6 flex justify-end space-x-2"> {/* Added space-x-2 for spacing between buttons */}
+        <div className="mt-6 flex flex-wrap justify-end gap-2"> {/* Changed to flex-wrap gap-2 */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" disabled={isDeleteDisabled}>

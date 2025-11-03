@@ -35,17 +35,20 @@ const Faculty = () => {
     try {
       setIsLoading(true);
       
-      // Get current user role
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: userDetails } = await supabase
+        const { data: userDetails, error: userDetailsError } = await supabase
           .from('users')
           .select('role')
           .eq('id', user.id)
           .single();
         
+        if (userDetailsError) throw userDetailsError;
+        
         if (userDetails) {
           setCurrentUserRole(userDetails.role);
+          console.log("Current user role:", userDetails.role); // Log current user role
         }
       }
       
@@ -98,6 +101,7 @@ const Faculty = () => {
   };
 
   const handleViewFaculty = (member: User) => {
+    console.log("View Faculty button clicked for:", member.name); // Log when view is clicked
     setSelectedFaculty(member);
     setIsViewFacultyDialogOpen(true);
   };
@@ -327,7 +331,7 @@ const Faculty = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </div >
   );
 };
 
