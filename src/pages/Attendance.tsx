@@ -12,12 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Save, Copy } from "lucide-react"; // Import Copy icon
 import { useToast } from "@/hooks/use-toast";
-import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Student, AttendanceRecord } from "@/lib/db";
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog
-import MobileBottomNavigation from "@/components/MobileBottomNavigation"; // Import MobileBottomNavigation
 
 const Attendance = () => {
   const { id } = useParams();
@@ -390,20 +388,17 @@ const Attendance = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Navigation />
         <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
         </div>
-        <MobileBottomNavigation />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
       <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Take Attendance</h1>
@@ -617,7 +612,6 @@ const Attendance = () => {
           </AlertDialog>
         </div>
       </div>
-      <MobileBottomNavigation />
     </div>
   );
 };

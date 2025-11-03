@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Download, Filter, ListFilter } from "lucide-react"; // Import ListFilter icon
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Semester, Student } from "@/lib/db";
@@ -19,7 +18,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport"; // Import new component
 import DeleteAllAttendanceDialog from "@/components/reports/DeleteAllAttendanceDialog"; // Import new component
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
-import MobileBottomNavigation from "@/components/MobileBottomNavigation"; // Import MobileBottomNavigation
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -284,20 +282,17 @@ const Reports = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Navigation />
         <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
         </div>
-        <MobileBottomNavigation />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
       <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Attendance Reports</h1>
@@ -494,7 +489,6 @@ const Reports = () => {
           </TabsContent>
         </Tabs>
       </div>
-      <MobileBottomNavigation />
     </div>
   );
 };

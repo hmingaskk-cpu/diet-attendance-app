@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Edit, Trash2, Eye } from "lucide-react";
-import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@/lib/db";
@@ -18,7 +17,6 @@ import EditFacultyDialog from "@/components/faculty/EditFacultyDialog";
 import ViewFacultyDialog from "@/components/faculty/ViewFacultyDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
-import MobileBottomNavigation from "@/components/MobileBottomNavigation"; // Import MobileBottomNavigation
 
 
 const Faculty = () => {
@@ -147,20 +145,17 @@ const Faculty = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Navigation />
         <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
         </div>
-        <MobileBottomNavigation />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
       <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Faculty Management</h1>
@@ -332,25 +327,6 @@ const Faculty = () => {
           </CardContent>
         </Card>
       </div>
-      <AddFacultyDialog 
-        isOpen={isAddFacultyDialogOpen} 
-        onClose={() => {
-          setIsAddFacultyDialogOpen(false);
-        }} 
-        onFacultyAdded={fetchFacultyData} 
-      />
-      <EditFacultyDialog 
-        isOpen={isEditFacultyDialogOpen} 
-        onClose={() => setIsEditFacultyDialogOpen(false)} 
-        facultyMember={selectedFaculty}
-        onFacultyUpdated={fetchFacultyData}
-      />
-      <ViewFacultyDialog
-        isOpen={isViewFacultyDialogOpen}
-        onClose={() => setIsViewFacultyDialogOpen(false)}
-        facultyMember={selectedFaculty}
-      />
-      <MobileBottomNavigation />
     </div>
   );
 };
