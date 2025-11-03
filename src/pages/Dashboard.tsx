@@ -61,15 +61,15 @@ const Dashboard = () => {
           }
           setStudentCounts(counts);
           
-          // Get today's attendance count (system-wide)
+          // Get today's attendance count (system-wide) - now counting distinct periods
           const today = new Date().toISOString().split('T')[0];
-          const { count: attendanceCount, error: attendanceError } = await supabase
+          const { data: distinctPeriodsData, error: distinctPeriodsError } = await supabase
             .from('attendance_records')
-            .select('*', { count: 'exact', head: true })
-            .eq('date', today); // Removed faculty_id filter
+            .select('period', { distinct: true })
+            .eq('date', today);
           
-          if (attendanceError) throw attendanceError;
-          setTodayAttendanceCount(attendanceCount || 0);
+          if (distinctPeriodsError) throw distinctPeriodsError;
+          setTodayAttendanceCount(distinctPeriodsData?.length || 0);
           
           // Get this month's attendance entries count (system-wide)
           const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)

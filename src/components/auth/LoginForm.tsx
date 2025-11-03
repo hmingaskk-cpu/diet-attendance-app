@@ -94,13 +94,10 @@ const LoginForm = () => {
         });
         await supabase.auth.signOut(); // Log out the user from auth session
       } else {
-        toast({
-          title: "Login Successful",
-          description: "Redirecting to dashboard...",
-        });
+        // Login successful, no toast needed, just redirect
         setTimeout(() => {
           navigate("/dashboard");
-        }, 1000);
+        }, 100); // Small delay for state update
       }
     }
     
