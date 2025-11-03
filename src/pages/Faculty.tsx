@@ -88,6 +88,7 @@ const Faculty = () => {
   };
 
   const handleEditFaculty = (member: User) => {
+    console.log("handleEditFaculty called with member:", member);
     if (currentUserRole !== "admin") {
       toast({
         title: "Access Denied",
@@ -98,12 +99,14 @@ const Faculty = () => {
     }
     setSelectedFaculty(member);
     setIsEditFacultyDialogOpen(true);
+    console.log("isEditFacultyDialogOpen set to true for member:", member.name);
   };
 
   const handleViewFaculty = (member: User) => {
-    console.log("View Faculty button clicked for:", member.name); // Log when view is clicked
+    console.log("handleViewFaculty called with member:", member);
     setSelectedFaculty(member);
     setIsViewFacultyDialogOpen(true);
+    console.log("isViewFacultyDialogOpen set to true for member:", member.name);
   };
 
   const handleDeleteFaculty = async (id: string) => {
