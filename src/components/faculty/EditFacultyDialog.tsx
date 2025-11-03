@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Removed Dialog import
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { User } from "@/lib/db"; // Ensure User type is correctly imported
+import { User } from "@/lib/db";
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -40,7 +40,7 @@ const editFacultyFormSchema = z.object({
   }),
   abbreviation: z.string().min(1, {
     message: "Abbreviation is required.",
-  }).max(5, { // Allowing a bit more flexibility than 3, but keeping it short
+  }).max(5, {
     message: "Abbreviation must not be longer than 5 characters.",
   }),
   newPassword: z.string().min(6, {
@@ -53,7 +53,7 @@ type EditFacultyFormValues = z.infer<typeof editFacultyFormSchema>;
 interface EditFacultyDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  facultyMember: User | null; // Corrected type from Student to User
+  facultyMember: User | null;
   onFacultyUpdated: () => void;
 }
 
@@ -75,7 +75,7 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
 
   useEffect(() => {
     if (isOpen && facultyMember) {
-      console.log("EditFacultyDialog useEffect: isOpen is true, facultyMember:", facultyMember); // Added log
+      console.log("EditFacultyDialog useEffect: isOpen is true, facultyMember:", facultyMember);
       const validRoles = ["faculty", "admin"];
       const validStatuses = ["active", "inactive", "pending"];
 
@@ -99,7 +99,6 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
     setIsLoading(true);
     
     try {
-      // Update user details in public.users table
       const { error: userUpdateError } = await supabase
         .from('users')
         .update({
@@ -107,26 +106,23 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
           email: values.email,
           role: values.role,
           status: values.status,
-          abbreviation: values.abbreviation, // Update abbreviation
+          abbreviation: values.abbreviation,
           updated_at: new Date().toISOString(),
         })
         .eq('id', facultyMember.id);
 
       if (userUpdateError) throw userUpdateError;
 
-      // If a new password is provided, call the Edge Function to update it
       if (values.newPassword) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           throw new Error("User not authenticated to perform this action.");
         }
 
-        // Call the Edge Function to update the password
-        // Pass a plain object for the body, supabase.functions.invoke will stringify it
         const { data: passwordUpdateData, error: passwordUpdateError } = await supabase.functions.invoke(
           'admin-update-user-password',
           {
-            body: { userId: facultyMember.id, newPassword: values.newPassword }, // Corrected: pass plain object
+            body: { userId: facultyMember.id, newPassword: values.newPassword },
             headers: {
               'Authorization': `Bearer ${user.access_token}`,
             },
@@ -159,151 +155,146 @@ const EditFacultyDialog = ({ isOpen, onClose, facultyMember, onFacultyUpdated }:
     }
   };
 
-  console.log("EditFacultyDialog render: isOpen =", isOpen, "facultyMember =", facultyMember?.name); // Added log
+  console.log("EditFacultyDialog render: isOpen =", isOpen, "facultyMember =", facultyMember?.name);
+
+  if (!isOpen) return null; // Only render content if isOpen is true
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      {console.log("EditFacultyDialog: Dialog component is mounted. Open state:", isOpen)} {/* New log */}
-      <DialogContent className="sm:max-w-[425px]">
-        {isOpen && console.log("EditFacultyDialog: DialogContent is rendering.")} {/* Existing log */}
-        {/* Visible test element */}
-        <div className="bg-red-500 text-white p-2 mb-4">
-          DEBUG: Edit Dialog Content is attempting to render!
-        </div>
-        <DialogHeader>
-          <DialogTitle>Edit Faculty Member</DialogTitle>
-          <DialogDescription>
-            Update the details for {facultyMember?.name}.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid gap-4 py-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
+    <DialogContent className="sm:max-w-[425px]">
+      {isOpen && console.log("EditFacultyDialog: DialogContent is rendering.")}
+      <DialogHeader>
+        <DialogTitle>Edit Faculty Member</DialogTitle>
+        <DialogDescription>
+          Update the details for {facultyMember?.name}.
+        </DialogDescription>
+      </DialogHeader>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <div className="grid gap-4 py-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="John Doe"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="faculty@dietkolasib.edu.in"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Input
-                        placeholder="John Doe"
-                        {...field}
-                      />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <SelectContent>
+                      <SelectItem value="faculty">Faculty</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="faculty@dietkolasib.edu.in"
-                        {...field}
-                      />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="faculty">Faculty</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="abbreviation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Abbreviation</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="LHM"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      A 3-letter abbreviation for this faculty member (e.g., LHM for Lalhmingmawia).
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Password (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter new password if changing"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Leave blank if you don't want to change the password.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="abbreviation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Abbreviation</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="LHM"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    A 3-letter abbreviation for this faculty member (e.g., LHM for Lalhmingmawia).
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="newPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>New Password (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="Enter new password if changing"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Leave blank if you don't want to change the password.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Form>
+    </DialogContent>
   );
 };
 
