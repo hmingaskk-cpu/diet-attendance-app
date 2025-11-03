@@ -16,8 +16,8 @@ import AddFacultyDialog from "@/components/faculty/AddFacultyDialog";
 import EditFacultyDialog from "@/components/faculty/EditFacultyDialog";
 import ViewFacultyDialog from "@/components/faculty/ViewFacultyDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
-
+import LoadingSkeleton from "@/components/LoadingSkeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"; // Import Dialog components
 
 const Faculty = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,7 +48,7 @@ const Faculty = () => {
         
         if (userDetails) {
           setCurrentUserRole(userDetails.role);
-          console.log("Current user role:", userDetails.role); // Log current user role
+          console.log("Current user role:", userDetails.role);
         }
       }
       
@@ -152,7 +152,7 @@ const Faculty = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
+        <div className="p-4 md:p-6 pb-20 md:pb-6">
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
@@ -163,7 +163,7 @@ const Faculty = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
+      <div className="p-4 md:p-6 pb-20 md:pb-6">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Faculty Management</h1>
           <p className="text-gray-600">Manage faculty accounts and permissions</p>
@@ -213,7 +213,7 @@ const Faculty = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto"> {/* Make table horizontally scrollable */}
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -334,6 +334,39 @@ const Faculty = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* TEST DIALOG - ALWAYS OPEN */}
+      <Dialog open={true}>
+        <DialogContent className="sm:max-w-[425px]">
+          {console.log("TEST DIALOG: DialogContent is rendering!")}
+          <DialogHeader>
+            <DialogTitle>Test Dialog</DialogTitle>
+            <DialogDescription>
+              This dialog should always be visible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 bg-green-100">
+            <p>If you see this, the Dialog component is working!</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AddFacultyDialog 
+        isOpen={isAddFacultyDialogOpen} 
+        onClose={() => setIsAddFacultyDialogOpen(false)} 
+        onFacultyAdded={fetchFacultyData} 
+      />
+      <EditFacultyDialog
+        isOpen={isEditFacultyDialogOpen}
+        onClose={() => setIsEditFacultyDialogOpen(false)}
+        facultyMember={selectedFaculty}
+        onFacultyUpdated={fetchFacultyData}
+      />
+      <ViewFacultyDialog
+        isOpen={isViewFacultyDialogOpen}
+        onClose={() => setIsViewFacultyDialogOpen(false)}
+        facultyMember={selectedFaculty}
+      />
     </div >
   );
 };
