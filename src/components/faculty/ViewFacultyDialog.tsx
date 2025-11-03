@@ -25,16 +25,61 @@ const ViewFacultyDialog = ({ isOpen, onClose, facultyMember }: ViewFacultyDialog
       {console.log("ViewFacultyDialog: Dialog component is mounted. Open state:", isOpen)} {/* New log */}
       <DialogContent className="sm:max-w-[425px]">
         {isOpen && console.log("ViewFacultyDialog: DialogContent is rendering.")} {/* Existing log */}
+        {/* Visible test element */}
+        <div className="bg-red-500 text-white p-2 mb-4">
+          DEBUG: View Dialog Content is attempting to render!
+        </div>
         <DialogHeader>
           <DialogTitle>Faculty Member Details</DialogTitle>
           <DialogDescription>
             Viewing details for {facultyMember.name}.
           </DialogDescription>
         </DialogHeader>
-        {/* Temporarily simplified content */}
-        <div className="p-4">
-          <p>This is a test for ViewFacultyDialog content.</p>
-          <p>Faculty Name: {facultyMember?.name}</p>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Name
+            </Label>
+            <Input id="name" value={facultyMember.name} readOnly className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="email" className="text-right">
+              Email
+            </Label>
+            <Input id="email" value={facultyMember.email} readOnly className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="role" className="text-right">
+              Role
+            </Label>
+            <div className="col-span-3">
+              <Badge variant={facultyMember.role === "admin" ? "default" : "secondary"}>
+                {facultyMember.role}
+              </Badge>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="status" className="text-right">
+              Status
+            </Label>
+            <div className="col-span-3">
+              <Badge variant={facultyMember.status === "active" ? "default" : "destructive"}>
+                {facultyMember.status}
+              </Badge>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="createdAt" className="text-right">
+              Created At
+            </Label>
+            <Input id="createdAt" value={new Date(facultyMember.created_at).toLocaleString()} readOnly className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="updatedAt" className="text-right">
+              Last Updated
+            </Label>
+            <Input id="updatedAt" value={new Date(facultyMember.updated_at).toLocaleString()} readOnly className="col-span-3" />
+          </div>
         </div>
       </DialogContent>
     </Dialog>
