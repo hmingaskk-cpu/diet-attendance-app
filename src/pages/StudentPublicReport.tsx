@@ -80,9 +80,7 @@ const StudentPublicReport = () => {
       try {
         const fetchedSemesters = await getSemesters();
         setSemesters(fetchedSemesters);
-        if (fetchedSemesters.length > 0) {
-          setSelectedSemesterId(fetchedSemesters[0].id.toString());
-        }
+        // Do NOT set a default selectedSemesterId here
       } catch (error: any) {
         toast({
           title: "Error fetching semesters",
@@ -96,7 +94,7 @@ const StudentPublicReport = () => {
     fetchSemesters();
   }, [toast]);
 
-  // Fetch students when selectedSemesterId changes (now runs regardless of isAuthenticated)
+  // Fetch students when selectedSemesterId changes
   useEffect(() => {
     const fetchStudents = async () => {
       if (!selectedSemesterId) {
@@ -109,15 +107,10 @@ const StudentPublicReport = () => {
       try {
         const students = await getStudentsBySemester(parseInt(selectedSemesterId));
         setStudentsInSemester(students);
-        if (students.length > 0) {
-          setSelectedStudentId(students[0].id.toString());
-          setSelectedStudentName(students[0].name);
-          setSelectedStudentRollNumber(students[0].roll_number);
-        } else {
-          setSelectedStudentId(null);
-          setSelectedStudentName("");
-          setSelectedStudentRollNumber("");
-        }
+        // Do NOT set a default selectedStudentId here
+        setSelectedStudentId(null); // Clear student selection when semester changes
+        setSelectedStudentName("");
+        setSelectedStudentRollNumber("");
       } catch (error: any) {
         toast({
           title: "Error fetching students",
@@ -130,9 +123,8 @@ const StudentPublicReport = () => {
         setSelectedStudentRollNumber("");
       }
     };
-    // This now runs whenever selectedSemesterId changes, allowing dropdown to populate
     fetchStudents();
-  }, [selectedSemesterId, toast]); // Removed isAuthenticated from dependencies
+  }, [selectedSemesterId, toast]);
 
   const handlePasswordSubmit = () => {
     const correctPassword = import.meta.env.VITE_STUDENT_REPORT_PASSWORD;
@@ -164,6 +156,9 @@ const StudentPublicReport = () => {
     if (student) {
       setSelectedStudentName(student.name);
       setSelectedStudentRollNumber(student.roll_number);
+    } else {
+      setSelectedStudentName("");
+      setSelectedStudentRollNumber("");
     }
   };
 
@@ -270,8 +265,11 @@ const StudentPublicReport = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  {studentsInSemester.length === 0 && (
+                  {studentsInSemester.length === 0 && selectedSemesterId && (
                     <p className="text-sm text-gray-500">No students available in this semester.</p>
+                  )}
+                  {!selectedSemesterId && (
+                    <p className="text-sm text-gray-500">Please select a semester first.</p>
                   )}
                 </div>
               </CardContent>
