@@ -10,12 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Save, Copy, Trash2 } from "lucide-react"; // Import Copy and Trash2 icons
+import { Calendar, User, Save, Copy, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { Student, AttendanceRecord } from "@/lib/db";
-import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog
+import LoadingSkeleton from "@/components/LoadingSkeleton";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const Attendance = () => {
   const { id } = useParams();
@@ -24,19 +24,18 @@ const Attendance = () => {
   const [facultyName, setFacultyName] = useState("");
   const [facultyId, setFacultyId] = useState("");
   const [period, setPeriod] = useState("1");
-  const today = new Date().toISOString().split('T')[0]; // Get current date once
-  const [date, setDate] = useState(today); // Initialize with current date
+  const today = new Date().toISOString().split('T')[0];
+  const [date, setDate] = useState(today);
   const [selectAll, setSelectAll] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
   const [students, setStudents] = useState<Student[]>([]);
   const [semesterName, setSemesterName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUserRole, setCurrentUserRole] = useState(""); // New state for current user's role
-  // Stores status for each period: { status: 'taken-by-me' | 'taken-by-other', abbreviation?: string }
+  const [currentUserRole, setCurrentUserRole] = useState("");
   const [globalPeriodStatuses, setGlobalPeriodStatuses] = useState<Record<number, { status: 'taken-by-me' | 'taken-by-other' | undefined; abbreviation?: string | null }>>({});
-  const [previousPeriodAttendance, setPreviousPeriodAttendance] = useState<Record<string, boolean>>({}); // New state for previous period's attendance
+  const [previousPeriodAttendance, setPreviousPeriodAttendance] = useState<Record<string, boolean>>({});
+  const [cachedAttendance, setCachedAttendance] = useState<any | null>(null); // New state for cached data
 
-  // Define isCurrentDate here, accessible in JSX
   const isCurrentDate = date === today;
 
   useEffect(() => {
@@ -44,7 +43,6 @@ const Attendance = () => {
       try {
         setIsLoading(true);
         
-        // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           navigate("/login");
@@ -53,7 +51,6 @@ const Attendance = () => {
         
         setFacultyId(user.id);
         
-        // Get user details and role
         const { data: userDetails, error: userDetailsError } = await supabase
           .from('users')
           .select('name, role')
@@ -63,9 +60,8 @@ const Attendance = () => {
         if (userDetailsError) throw userDetailsError;
         
         setFacultyName(userDetails?.name || "Faculty");
-        setCurrentUserRole(userDetails?.role || ""); // Set the current user's role
+        setCurrentUserRole(userDetails?.role || "");
         
-        // Get semester details
         const { data: semesterData, error: semesterError } = await supabase
           .from('semesters')
           .select('name')
@@ -75,7 +71,6 @@ const Attendance = () => {
         if (semesterError) throw semesterError;
         setSemesterName(semesterData?.name || "");
         
-        // Get students for this semester
         const { data: studentsData, error: studentsError } = await supabase
           .from('students')
           .select('*')
@@ -85,8 +80,6 @@ const Attendance = () => {
         if (studentsError) throw studentsError;
         setStudents(studentsData || []);
         
-        // --- New Logic: Check global attendance status for all periods today ---
-        // Fetch all attendance records for the selected date and semester, including faculty abbreviation
         const { data: allAttendanceToday, error: allAttendanceError } = await supabase
           .from('attendance_records')
           .select(`
@@ -109,44 +102,66 @@ const Attendance = () => {
           }
         });
         setGlobalPeriodStatuses(newGlobalPeriodStatuses);
+
+        // --- New Logic: Check for cached data first ---
+        const currentFacultyId = user.id;
+        const cachedKey = `cachedAttendance_${currentFacultyId}_${id}_${date}_${period}`;
+        const storedCachedData = localStorage.getItem(cachedKey);
+
+        if (storedCachedData) {
+          const parsedCachedData = JSON.parse(storedCachedData);
+          setCachedAttendance(parsedCachedData);
+          
+          const cachedRecordsMap: Record<string, boolean> = {};
+          parsedCachedData.records.forEach((record: any) => {
+            cachedRecordsMap[record.student_id.toString()] = record.is_present;
+          });
+          setAttendance(cachedRecordsMap);
+
+          const allPresentInCache = studentsData.every(student => cachedRecordsMap[student.id.toString()] === true);
+          setSelectAll(allPresentInCache);
+
+          toast({
+            title: "Offline Data Found",
+            description: "Attendance data for this period was previously saved offline. Please review and submit.",
+            variant: "default",
+            duration: 7000,
+          });
+        } else {
+          // If no cached data, then fetch existing attendance from DB
+          let attendanceQuery = supabase
+            .from('attendance_records')
+            .select(`
+              student_id,
+              is_present
+            `)
+            .eq('date', date)
+            .eq('period', period)
+            .eq('semester_id', id);
+
+          const currentPeriodNum = parseInt(period);
+          const periodStatus = newGlobalPeriodStatuses[currentPeriodNum];
+
+          if (!(currentUserRole === 'admin' && periodStatus?.status === 'taken-by-other')) {
+            attendanceQuery = attendanceQuery.eq('faculty_id', user.id);
+          }
+          
+          const { data: attendanceData, error: attendanceError } = await attendanceQuery;
+          
+          if (attendanceError) throw attendanceError;
+          
+          const initialAttendance: Record<string, boolean> = {};
+          attendanceData?.forEach(record => {
+            initialAttendance[record.student_id.toString()] = record.is_present;
+          });
+          
+          setAttendance(initialAttendance);
+          setCachedAttendance(null); // Ensure cachedAttendance is null if no cache
+        }
         // --- End New Logic ---
 
-        // Get existing attendance records for the CURRENTLY SELECTED period
-        let attendanceQuery = supabase
-          .from('attendance_records')
-          .select(`
-            student_id,
-            is_present
-          `)
-          .eq('date', date)
-          .eq('period', period)
-          .eq('semester_id', id);
-
-        const currentPeriodNum = parseInt(period);
-        const periodStatus = newGlobalPeriodStatuses[currentPeriodNum]; // Use the newly fetched statuses
-
-        // If the current user is an admin AND the period was taken by someone else,
-        // we should load ALL records for that period, not just the admin's.
-        // Otherwise, load only records taken by the current user (or if no one took it yet).
-        if (!(currentUserRole === 'admin' && periodStatus?.status === 'taken-by-other')) {
-          attendanceQuery = attendanceQuery.eq('faculty_id', user.id);
-        }
-        
-        const { data: attendanceData, error: attendanceError } = await attendanceQuery;
-        
-        if (attendanceError) throw attendanceError;
-        
-        // Initialize attendance state with existing records
-        const initialAttendance: Record<string, boolean> = {};
-        attendanceData?.forEach(record => {
-          initialAttendance[record.student_id.toString()] = record.is_present;
-        });
-        
-        setAttendance(initialAttendance);
-
-        // --- Fetch attendance for the previous period (if applicable) ---
-        if (currentPeriodNum > 1) {
-          const previousPeriodNum = currentPeriodNum - 1;
+        if (parseInt(period) > 1) {
+          const previousPeriodNum = parseInt(period) - 1;
           const { data: prevPeriodData, error: prevPeriodError } = await supabase
             .from('attendance_records')
             .select(`
@@ -165,7 +180,7 @@ const Attendance = () => {
           });
           setPreviousPeriodAttendance(prevAttendanceMap);
         } else {
-          setPreviousPeriodAttendance({}); // Clear if on first period
+          setPreviousPeriodAttendance({});
         }
 
       } catch (error: any) {
@@ -182,7 +197,7 @@ const Attendance = () => {
     if (id) {
       fetchData();
     }
-  }, [id, date, period, navigate, toast, currentUserRole]); // Added currentUserRole to dependencies
+  }, [id, date, period, navigate, toast, currentUserRole]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -212,7 +227,6 @@ const Attendance = () => {
 
     setAttendance(previousPeriodAttendance);
     
-    // Check if all students were present in the previous period to update selectAll checkbox
     const allPresentInPrevious = students.every(student => previousPeriodAttendance[student.id.toString()] === true);
     setSelectAll(allPresentInPrevious);
 
@@ -223,8 +237,6 @@ const Attendance = () => {
   };
 
   const handleSubmit = async () => {
-    console.log("handleSubmit triggered!");
-
     if (!facultyId) {
       toast({
         title: "Authentication Error",
@@ -236,9 +248,8 @@ const Attendance = () => {
 
     const currentPeriodNum = parseInt(period);
     const periodStatus = globalPeriodStatuses[currentPeriodNum];
-    const isCurrentDate = date === today; // Check if the selected date is today
+    const isCurrentDate = date === today;
 
-    // If attendance is taken by another faculty and current user is NOT admin, prevent submission
     if (periodStatus?.status === 'taken-by-other' && currentUserRole !== 'admin') {
       toast({
         title: "Attendance Already Taken",
@@ -249,7 +260,6 @@ const Attendance = () => {
     }
 
     try {
-      // If attendance was taken by another faculty and current user IS admin, warn them
       if (periodStatus?.status === 'taken-by-other' && currentUserRole === 'admin') {
         toast({
           title: "Overwriting Attendance",
@@ -259,19 +269,15 @@ const Attendance = () => {
         });
       }
 
-      // Prepare attendance records for Supabase
       const attendanceRecordsForSupabase = students.map(student => ({
         date,
         period: currentPeriodNum,
-        faculty_id: facultyId, // Always use the current faculty's ID for the new records
+        faculty_id: facultyId,
         semester_id: parseInt(id || "0"),
         student_id: student.id,
         is_present: attendance[student.id.toString()] ?? false
       }));
 
-      // Delete existing records for this date/period/semester
-      // If admin, delete ALL records for this period/date/semester.
-      // If faculty, delete only their OWN records for this period/date/semester (if they had taken it).
       let deleteQuery = supabase
         .from('attendance_records')
         .delete()
@@ -286,20 +292,22 @@ const Attendance = () => {
       const { error: deleteError } = await deleteQuery;
       if (deleteError) throw deleteError;
 
-      // Insert new records into Supabase
       const { error: insertError } = await supabase
         .from('attendance_records')
         .insert(attendanceRecordsForSupabase);
 
       if (insertError) throw insertError;
 
+      // If successful, clear cached data
+      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}`;
+      localStorage.removeItem(cachedKey);
+      setCachedAttendance(null);
+
       toast({
         title: isCurrentDate ? "Attendance Submitted" : "Attendance Updated",
         description: `Attendance for ${semesterName} (Period ${period}) on ${date} has been ${isCurrentDate ? "saved" : "updated"}.`,
       });
 
-      // Update global period status to 'taken-by-me' after successful submission
-      // We need to fetch the current user's abbreviation to update the status correctly
       const { data: currentUserDetails, error: currentUserDetailsError } = await supabase
         .from('users')
         .select('abbreviation')
@@ -313,8 +321,7 @@ const Attendance = () => {
         [currentPeriodNum]: { status: 'taken-by-me', abbreviation: currentUserDetails?.abbreviation }
       }));
 
-      // --- Invoke Edge Function for Google Sheets Export using direct fetch ---
-      if (isCurrentDate) { // Only export if it's the current date
+      if (isCurrentDate) {
         try {
           const studentsForExport = students.map(student => ({
             name: student.name,
@@ -329,8 +336,6 @@ const Attendance = () => {
             facultyName,
             studentsAttendance: studentsForExport,
           };
-
-          console.log("Client-side: Sending body to Edge Function (direct fetch):", exportBody);
 
           const { data: { session } } = await supabase.auth.getSession();
           const accessToken = session?.access_token;
@@ -371,13 +376,34 @@ const Attendance = () => {
           });
         }
       }
-      // --- End Edge Function Invocation ---
 
     } catch (error: any) {
+      console.error("Error saving attendance:", error);
+      
+      // Construct cached data object
+      const cachedData = {
+        date,
+        period: currentPeriodNum,
+        semester_id: parseInt(id || "0"),
+        faculty_id: facultyId,
+        records: students.map(student => ({
+          date,
+          period: currentPeriodNum,
+          faculty_id: facultyId,
+          semester_id: parseInt(id || "0"),
+          student_id: student.id,
+          is_present: attendance[student.id.toString()] ?? false
+        }))
+      };
+      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}`;
+      localStorage.setItem(cachedKey, JSON.stringify(cachedData));
+      setCachedAttendance(cachedData);
+
       toast({
-        title: "Error saving attendance",
-        description: error.message,
-        variant: "destructive"
+        title: "Submission Failed",
+        description: `Failed to submit attendance: ${error.message}. Data has been saved locally. Please try again later.`,
+        variant: "destructive",
+        duration: 7000,
       });
     }
   };
@@ -401,8 +427,6 @@ const Attendance = () => {
         .eq('period', period)
         .eq('semester_id', id);
 
-      // If not admin, restrict deletion to their own records.
-      // RLS will also enforce this, but it's good practice to filter client-side.
       if (currentUserRole !== 'admin') {
         deleteQuery = deleteQuery.eq('faculty_id', facultyId);
       }
@@ -411,17 +435,21 @@ const Attendance = () => {
 
       if (error) throw error;
 
+      // Clear cached data if it exists for this period
+      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}`;
+      localStorage.removeItem(cachedKey);
+      setCachedAttendance(null);
+
       toast({
         title: "Attendance Deleted",
         description: `Attendance for Period ${period} on ${date} has been deleted.`,
       });
 
-      // Clear attendance state and update global period status
       setAttendance({});
-      setSelectAll(false); // Reset select all checkbox
+      setSelectAll(false);
       setGlobalPeriodStatuses(prev => {
         const newState = { ...prev };
-        delete newState[parseInt(period)]; // Remove the status for the deleted period
+        delete newState[parseInt(period)];
         return newState;
       });
 
@@ -436,11 +464,7 @@ const Attendance = () => {
     }
   };
 
-  // Disable submission only if it's taken by another faculty AND the current user is NOT an admin
   const isSubmitDisabled = globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole !== 'admin';
-
-  // Disable delete button if no attendance is taken for this period,
-  // OR if it's taken by another faculty and current user is NOT admin.
   const currentPeriodStatus = globalPeriodStatuses[parseInt(period)];
   const isDeleteDisabled = !currentPeriodStatus || (currentPeriodStatus.status === 'taken-by-other' && currentUserRole !== 'admin');
 
@@ -448,7 +472,7 @@ const Attendance = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
+        <div className="p-4 md:p-6 pb-20 md:pb-6">
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
@@ -459,7 +483,7 @@ const Attendance = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
+      <div className="p-4 md:p-6 pb-20 md:pb-6">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Take Attendance</h1>
           <p className="text-gray-600">
@@ -486,7 +510,7 @@ const Attendance = () => {
                     value={facultyName}
                     onChange={(e) => setFacultyName(e.target.value)}
                     className="rounded-l-none"
-                    readOnly // Faculty name should ideally come from auth and not be editable here
+                    readOnly
                   />
                 </div>
               </div>
@@ -538,7 +562,7 @@ const Attendance = () => {
               </div>
             </div>
             {isSubmitDisabled && (
-              <p className="text-destructive text-sm mt-2"> {/* Use destructive color */}
+              <p className="text-destructive text-sm mt-2">
                 Attendance for Period {period} on {date} has already been submitted by another faculty member. You cannot modify it.
               </p>
             )}
@@ -552,14 +576,14 @@ const Attendance = () => {
 
         <Card className="shadow-sm rounded-lg">
           <CardHeader>
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"> {/* Added flex-col and gap-4 for responsiveness */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
                 <CardTitle>Student List</CardTitle>
                 <CardDescription>
                   Mark attendance for each student
                 </CardDescription>
               </div>
-              <div className="flex flex-wrap gap-2"> {/* Changed to flex-wrap gap-2 */}
+              <div className="flex flex-wrap gap-2">
                 {parseInt(period) > 1 && (
                   <Button
                     variant="outline"
@@ -635,7 +659,7 @@ const Attendance = () => {
           </CardContent>
         </Card>
 
-        <div className="mt-6 flex flex-wrap justify-end gap-2"> {/* Changed to flex-wrap gap-2 */}
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" disabled={isDeleteDisabled}>
@@ -668,7 +692,7 @@ const Attendance = () => {
             <AlertDialogTrigger asChild>
               <Button size="lg" disabled={isSubmitDisabled}>
                 <Save className="mr-2 h-4 w-4" />
-                {isCurrentDate ? "Submit Attendance" : "Update Attendance"}
+                {cachedAttendance ? "Retry Submission" : (isCurrentDate ? "Submit Attendance" : "Update Attendance")}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
