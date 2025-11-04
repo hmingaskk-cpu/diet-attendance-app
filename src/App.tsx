@@ -14,6 +14,7 @@ import LoginForm from "./components/auth/LoginForm";
 import SignupForm from "./components/auth/SignupForm";
 import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
+import StudentPublicReport from "./pages/StudentPublicReport"; // Import the new public report page
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
@@ -71,6 +72,7 @@ const AuthenticatedApp = () => {
       <Route path="/signup" element={<SignupForm />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/update-password" element={<UpdatePassword />} />
+      <Route path="/student-public-report" element={<StudentPublicReport />} /> {/* New public report route */}
       <Route 
         path="/dashboard" 
         element={
