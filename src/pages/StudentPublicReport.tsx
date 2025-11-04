@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch"; // Import Switch component
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox component
 import { useToast } from "@/hooks/use-toast";
 import { getSemesters, getStudentsBySemester, Semester, Student } from "@/lib/db";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
@@ -32,6 +33,7 @@ const StudentPublicReport = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [rememberMe, setRememberMe] = useState(false); // New state for remember me
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState<string | null>(null);
   const [studentsInSemester, setStudentsInSemester] = useState<Student[]>([]);
@@ -57,6 +59,20 @@ const StudentPublicReport = () => {
   const reportEndDate = viewMode === "all"
     ? "2099-12-31" // Arbitrary future date for "all records"
     : `${selectedYear}-${selectedMonth}-${new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate()}`; // Last day of the selected month
+
+  // Load saved password from localStorage on mount
+  useEffect(() => {
+    const savedPassword = localStorage.getItem("studentReportPassword");
+    if (savedPassword) {
+      setPasswordInput(savedPassword);
+      setRememberMe(true);
+      // Automatically authenticate if a password is saved
+      const correctPassword = import.meta.env.VITE_STUDENT_REPORT_PASSWORD;
+      if (savedPassword === correctPassword) {
+        setIsAuthenticated(true);
+      }
+    }
+  }, []);
 
   // Fetch semesters on initial load
   useEffect(() => {
@@ -127,6 +143,11 @@ const StudentPublicReport = () => {
         title: "Access Granted",
         description: "You can now view student attendance reports.",
       });
+      if (rememberMe) {
+        localStorage.setItem("studentReportPassword", passwordInput);
+      } else {
+        localStorage.removeItem("studentReportPassword");
+      }
     } else {
       setPasswordError("Incorrect password. Please try again.");
       toast({
@@ -155,12 +176,12 @@ const StudentPublicReport = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-4">
-      <div className="container mx-auto py-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-4"> {/* Adjusted padding for mobile */}
+      <div className="container mx-auto py-8"> {/* Kept container for larger screens, but p-4 on outer div handles mobile */}
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">Student Attendance Report</h1>
 
         {!isAuthenticated ? (
-          <Card className="w-full max-w-md mx-auto shadow-lg rounded-lg">
+          <Card className="w-full mx-auto shadow-lg rounded-lg"> {/* Removed max-w-md */}
             <CardHeader className="text-center">
               <CardTitle className="text-2xl font-bold text-gray-800">Access Report</CardTitle>
               <CardDescription className="text-gray-600 mt-2">
@@ -183,6 +204,14 @@ const StudentPublicReport = () => {
                   }}
                 />
                 {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                />
+                <Label htmlFor="rememberMe">Remember me</Label>
               </div>
             </CardContent>
             <CardFooter>
