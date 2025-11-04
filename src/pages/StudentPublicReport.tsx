@@ -6,10 +6,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch"; // Import Switch component
 import { useToast } from "@/hooks/use-toast";
 import { getSemesters, getStudentsBySemester, Semester, Student } from "@/lib/db";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
 import StudentAttendanceView from "@/components/students/StudentAttendanceView"; // Import the new component
+import { CalendarIcon } from "lucide-react"; // Import CalendarIcon
+
+const months = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
 
 const StudentPublicReport = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -23,6 +40,23 @@ const StudentPublicReport = () => {
   const [selectedStudentRollNumber, setSelectedStudentRollNumber] = useState<string>("");
   const [isLoadingData, setIsLoadingData] = useState(true);
   const { toast } = useToast();
+
+  // New state for month/year selection
+  const currentYear = new Date().getFullYear().toString();
+  const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  const [selectedYear, setSelectedYear] = useState<string>(currentYear);
+  const [viewMode, setViewMode] = useState<"all" | "month">("all"); // "all" or "month"
+
+  // Calculate startDate and endDate based on viewMode, selectedMonth, selectedYear
+  const reportStartDate = viewMode === "all"
+    ? "2000-01-01" // Arbitrary past date for "all records"
+    : `${selectedYear}-${selectedMonth}-01`;
+
+  const reportEndDate = viewMode === "all"
+    ? "2099-12-31" // Arbitrary future date for "all records"
+    : `${selectedYear}-${selectedMonth}-${new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate()}`; // Last day of the selected month
 
   // Fetch semesters on initial load
   useEffect(() => {
@@ -215,11 +249,68 @@ const StudentPublicReport = () => {
             </Card>
 
             {selectedStudentId && selectedSemesterId ? (
+              <Card className="shadow-sm rounded-lg">
+                <CardHeader>
+                  <CardTitle>Filter Attendance</CardTitle>
+                  <CardDescription>
+                    View all records or filter by a specific month.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div className="flex items-center space-x-2 col-span-full md:col-span-1">
+                    <Switch
+                      id="view-mode"
+                      checked={viewMode === "month"}
+                      onCheckedChange={(checked) => setViewMode(checked ? "month" : "all")}
+                    />
+                    <Label htmlFor="view-mode">{viewMode === "month" ? "View by Month" : "View All Records"}</Label>
+                  </div>
+                  {viewMode === "month" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="month">Month</Label>
+                        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                          <SelectTrigger id="month">
+                            <SelectValue placeholder="Select month" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {months.map(month => (
+                              <SelectItem key={month.value} value={month.value}>
+                                {month.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="year">Year</Label>
+                        <div className="flex">
+                          <CalendarIcon className="h-10 w-10 p-2 border border-r-0 rounded-l-md bg-gray-100" />
+                          <Input
+                            id="year"
+                            type="number"
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(e.target.value)}
+                            className="rounded-l-none"
+                            min="2000" // Adjust as needed
+                            max={currentYear}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {selectedStudentId && selectedSemesterId ? (
               <StudentAttendanceView
                 studentId={parseInt(selectedStudentId)}
                 semesterId={parseInt(selectedSemesterId)}
                 studentName={selectedStudentName}
                 studentRollNumber={selectedStudentRollNumber}
+                startDate={reportStartDate}
+                endDate={reportEndDate}
               />
             ) : (
               <Card className="shadow-sm rounded-lg">

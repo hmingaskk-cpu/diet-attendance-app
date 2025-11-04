@@ -25,9 +25,11 @@ interface StudentAttendanceViewProps {
   semesterId: number;
   studentName: string;
   studentRollNumber: string;
+  startDate: string; // New prop
+  endDate: string;   // New prop
 }
 
-const StudentAttendanceView = ({ studentId, semesterId, studentName, studentRollNumber }: StudentAttendanceViewProps) => {
+const StudentAttendanceView = ({ studentId, semesterId, studentName, studentRollNumber, startDate, endDate }: StudentAttendanceViewProps) => {
   const [detailedReportData, setDetailedReportData] = useState<DetailedAttendanceRecord[]>([]);
   const [overallPercentage, setOverallPercentage] = useState<number>(0);
   const [totalPeriodsMarked, setTotalPeriodsMarked] = useState<number>(0);
@@ -35,13 +37,9 @@ const StudentAttendanceView = ({ studentId, semesterId, studentName, studentRoll
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Use a very wide date range to get all attendance records
-  const startDate = "2000-01-01"; // Arbitrary past date
-  const endDate = "2099-12-31";   // Arbitrary future date
-
   useEffect(() => {
     const fetchDetailedReport = async () => {
-      if (!studentId || !semesterId) {
+      if (!studentId || !semesterId || !startDate || !endDate) {
         setDetailedReportData([]);
         setOverallPercentage(0);
         setTotalPeriodsMarked(0);
@@ -79,7 +77,7 @@ const StudentAttendanceView = ({ studentId, semesterId, studentName, studentRoll
     };
 
     fetchDetailedReport();
-  }, [studentId, semesterId, toast]);
+  }, [studentId, semesterId, startDate, endDate, toast]); // Added startDate and endDate to dependencies
 
   // Process detailed report data for table display
   const dailyAttendance: DailyAttendance = useMemo(() => {
@@ -131,7 +129,7 @@ const StudentAttendanceView = ({ studentId, semesterId, studentName, studentRoll
 
         {detailedReportData.length === 0 ? (
           <div className="text-center p-8 text-gray-500">
-            No attendance data available for this student.
+            No attendance data available for this student in the selected period.
           </div>
         ) : (
           <div className="overflow-x-auto">
