@@ -46,7 +46,7 @@ const StudentPublicReport = () => {
     fetchSemesters();
   }, [toast]);
 
-  // Fetch students when selectedSemesterId changes
+  // Fetch students when selectedSemesterId changes (now runs regardless of isAuthenticated)
   useEffect(() => {
     const fetchStudents = async () => {
       if (!selectedSemesterId) {
@@ -80,10 +80,9 @@ const StudentPublicReport = () => {
         setSelectedStudentRollNumber("");
       }
     };
-    if (isAuthenticated) {
-      fetchStudents();
-    }
-  }, [selectedSemesterId, isAuthenticated, toast]);
+    // This now runs whenever selectedSemesterId changes, allowing dropdown to populate
+    fetchStudents();
+  }, [selectedSemesterId, toast]); // Removed isAuthenticated from dependencies
 
   const handlePasswordSubmit = () => {
     const correctPassword = import.meta.env.VITE_STUDENT_REPORT_PASSWORD;
