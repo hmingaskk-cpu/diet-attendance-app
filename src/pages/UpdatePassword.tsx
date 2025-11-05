@@ -12,7 +12,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import Navigation from "@/components/Navigation";
 import {
   Form,
   FormControl,
@@ -95,7 +94,7 @@ const UpdatePassword = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
-      <Navigation />
+      {/* Removed Navigation component */}
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4">
         <Card className="w-full max-w-md shadow-lg rounded-lg">
           <CardHeader className="text-center">

@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
-import Navigation from "@/components/Navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 import { useForm } from "react-hook-form";
@@ -115,7 +114,7 @@ const SignupForm = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
-      <Navigation />
+      {/* Removed Navigation component */}
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4">
         <Card className="w-full max-w-md shadow-lg rounded-lg">
           <CardHeader>

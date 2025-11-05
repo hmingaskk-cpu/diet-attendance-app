@@ -14,11 +14,12 @@ import LoginForm from "./components/auth/LoginForm";
 import SignupForm from "./components/auth/SignupForm";
 import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
-import StudentPublicReport from "./pages/StudentPublicReport"; // Import the new public report page
+import StudentPublicReport from "./pages/StudentPublicReport";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
+import AppLayout from "@/components/AppLayout"; // Import the new AppLayout
 
 const queryClient = new QueryClient();
 
@@ -72,12 +73,16 @@ const AuthenticatedApp = () => {
       <Route path="/signup" element={<SignupForm />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/update-password" element={<UpdatePassword />} />
-      <Route path="/student-public-report" element={<StudentPublicReport />} /> {/* New public report route */}
+      <Route path="/student-public-report" element={<StudentPublicReport />} />
+      
+      {/* Protected Routes wrapped with AppLayout */}
       <Route 
         path="/dashboard" 
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <AppLayout>
+              <Dashboard />
+            </AppLayout>
           </ProtectedRoute>
         } 
       />
@@ -85,7 +90,9 @@ const AuthenticatedApp = () => {
         path="/attendance/:id" 
         element={
           <ProtectedRoute>
-            <Attendance />
+            <AppLayout>
+              <Attendance />
+            </AppLayout>
           </ProtectedRoute>
         } 
       />
@@ -93,7 +100,9 @@ const AuthenticatedApp = () => {
         path="/reports" 
         element={
           <ProtectedRoute>
-            <Reports />
+            <AppLayout>
+              <Reports />
+            </AppLayout>
           </ProtectedRoute>
         } 
       />
@@ -101,7 +110,9 @@ const AuthenticatedApp = () => {
         path="/students" 
         element={
           <ProtectedRoute>
-            <Students />
+            <AppLayout>
+              <Students />
+            </AppLayout>
           </ProtectedRoute>
         } 
       />
@@ -109,7 +120,9 @@ const AuthenticatedApp = () => {
         path="/faculty" 
         element={
           <ProtectedRoute>
-            <Faculty />
+            <AppLayout>
+              <Faculty />
+            </AppLayout>
           </ProtectedRoute>
         } 
       />
