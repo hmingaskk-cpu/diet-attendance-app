@@ -23,7 +23,6 @@ const months = [
   { value: "06", label: "June" },
   { value: "07", label: "July" },
   { value: "08", label: "August" },
-  { value: "09", label: "September" },
   { value: "10", label: "October" },
   { value: "11", label: "November" },
   { value: "12", label: "December" },
@@ -172,11 +171,11 @@ const StudentPublicReport = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-4"> {/* Adjusted padding for mobile */}
-      <div className="container mx-auto py-8"> {/* Kept container for larger screens, but p-4 on outer div handles mobile */}
+      <div className="max-w-screen-lg mx-auto py-8"> {/* Changed from container to max-w-screen-lg */}
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">Student Attendance Report</h1>
 
         {!isAuthenticated ? (
-          <Card className="w-full mx-auto shadow-lg rounded-lg"> {/* Removed max-w-md */}
+          <Card className="w-full max-w-md mx-auto shadow-lg rounded-lg"> {/* Added max-w-md */}
             <CardHeader className="text-center">
               <CardTitle className="text-2xl font-bold text-gray-800">Access Report</CardTitle>
               <CardDescription className="text-gray-600 mt-2">
