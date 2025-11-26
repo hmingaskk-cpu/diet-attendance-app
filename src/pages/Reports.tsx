@@ -12,7 +12,7 @@ import { Calendar, Download, Filter, ListFilter } from "lucide-react"; // Import
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { Semester, Student } from "@/lib/db";
+import { Semester, Student, getStudentDetailedAttendance } from "@/lib/db"; // Import getStudentDetailedAttendance
 import Papa from "papaparse"; // Import PapaParse for CSV export
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
 import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport"; // Import new component
@@ -148,28 +148,8 @@ const Reports = () => {
         
         setAttendanceData(Object.values(chartData));
         
-        // Fetch student attendance percentages
-        const studentAttendanceQuery = supabase
-          .from('attendance_records')
-          .select(`
-            student_id,
-            is_present,
-            student:students (name, roll_number),
-            semester:semesters (name)
-          `)
-          .gte('date', dateRange.from)
-          .lte('date', dateRange.to);
-        
-        if (selectedClass !== "all") {
-          studentAttendanceQuery.eq('semester_id', selectedClass);
-        }
-        
-        const { data: studentData, error: studentError } = await studentAttendanceQuery;
-        
-        if (studentError) throw studentError;
-        
-        // Process student attendance data
-        const studentMap: Record<number, { 
+        // Fetch student attendance percentages for DAR table
+        const studentReportsMap: Record<number, { 
           id: number; 
           name: string; 
           roll: string; 
@@ -177,28 +157,68 @@ const Reports = () => {
           total: number; 
           present: number 
         }> = {};
-        
-        studentData?.forEach(record => {
-          const studentId = record.student_id;
-          if (!studentMap[studentId]) {
-            studentMap[studentId] = {
-              id: studentId,
-              name: record.student?.name || "Unknown",
-              roll: record.student?.roll_number || "Unknown",
-              class: record.semester?.name || "Unknown",
-              total: 0,
-              present: 0
+
+        if (selectedClass !== "all") {
+          // If a specific semester is selected, fetch students for that semester
+          const studentsInSelectedSemester = students.filter(s => s.semester_id.toString() === selectedClass);
+          
+          for (const student of studentsInSelectedSemester) {
+            const detailedAttendance = await getStudentDetailedAttendance(
+              student.id,
+              parseInt(selectedClass),
+              dateRange.from,
+              dateRange.to
+            );
+
+            const totalPeriods = detailedAttendance.length;
+            const periodsPresent = detailedAttendance.filter(record => record.is_present).length;
+            
+            studentReportsMap[student.id] = {
+              id: student.id,
+              name: student.name,
+              roll: student.roll_number,
+              class: semesters.find(s => s.id.toString() === selectedClass)?.name || "Unknown",
+              total: totalPeriods,
+              present: periodsPresent
             };
           }
-          
-          studentMap[studentId].total += 1;
-          if (record.is_present) {
-            studentMap[studentId].present += 1;
-          }
-        });
-        
-        // Calculate percentages
-        const studentReports = Object.values(studentMap).map(student => ({
+        } else {
+          // If "All Classes" is selected, aggregate attendance for each student across all their semesters.
+          const { data: allAttendanceRecords, error: allAttendanceError } = await supabase
+            .from('attendance_records')
+            .select(`
+              student_id,
+              is_present,
+              student:students (name, roll_number),
+              semester:semesters (name)
+            `)
+            .gte('date', dateRange.from)
+            .lte('date', dateRange.to);
+
+          if (allAttendanceError) throw allAttendanceError;
+
+          allAttendanceRecords?.forEach(record => {
+            const studentId = record.student_id;
+            if (!studentReportsMap[studentId]) {
+              studentReportsMap[studentId] = {
+                id: studentId,
+                name: record.student?.name || "Unknown",
+                roll: record.student?.roll_number || "Unknown",
+                class: "All Semesters", // Indicate aggregation across semesters
+                total: 0,
+                present: 0
+              };
+            }
+            
+            studentReportsMap[studentId].total += 1;
+            if (record.is_present) {
+              studentReportsMap[studentId].present += 1;
+            }
+          });
+        }
+
+        // Calculate percentages and convert map to array
+        const studentReports = Object.values(studentReportsMap).map(student => ({
           ...student,
           attendance: student.total > 0 ? Math.round((student.present / student.total) * 100) : 0
         }));
@@ -216,7 +236,7 @@ const Reports = () => {
     if (!isLoading) {
       fetchReportData();
     }
-  }, [dateRange, selectedClass, isLoading, toast]);
+  }, [dateRange, selectedClass, isLoading, toast, students, semesters]); // Added students and semesters to dependencies
 
   const handleGenerateReport = () => {
     // This will trigger the useEffect above
