@@ -155,9 +155,12 @@ const StudentPublicReport = () => {
     if (student) {
       setSelectedStudentName(student.name);
       setSelectedStudentRollNumber(student.roll_number);
+      // NEW: Set the selected semester to the student's current semester
+      setSelectedSemesterId(student.semester_id.toString()); 
     } else {
       setSelectedStudentName("");
       setSelectedStudentRollNumber("");
+      setSelectedSemesterId(null); // Clear semester selection if student is not found
     }
   };
 

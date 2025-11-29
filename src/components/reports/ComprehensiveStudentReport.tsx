@@ -75,7 +75,7 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
   // Fetch detailed attendance for the selected student
   useEffect(() => {
     const fetchDetailedReport = async () => {
-      if (!selectedStudentId || !semesterId || !startDate || !endDate) {
+      if (!selectedStudentId || !startDate || !endDate) { // Removed semesterId from condition
         setDetailedReportData([]);
         setOverallPercentage(0);
         return;
@@ -83,7 +83,19 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
 
       setIsLoading(true);
       try {
-        const data = await getStudentDetailedAttendance(parseInt(selectedStudentId), semesterId, startDate, endDate);
+        // NEW: Fetch the student's current semester_id
+        const student = studentsInSemester.find(s => s.id.toString() === selectedStudentId);
+        if (!student) {
+          throw new Error("Selected student not found.");
+        }
+        const studentCurrentSemesterId = student.semester_id;
+
+        const data = await getStudentDetailedAttendance(
+          parseInt(selectedStudentId), 
+          studentCurrentSemesterId, // Use the student's current semester_id
+          startDate, 
+          endDate
+        );
         setDetailedReportData(data);
 
         // Calculate overall percentage
@@ -106,7 +118,7 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
     };
 
     fetchDetailedReport();
-  }, [selectedStudentId, semesterId, startDate, endDate, toast]);
+  }, [selectedStudentId, startDate, endDate, toast, studentsInSemester]); // Added studentsInSemester to dependencies
 
   const filteredStudents = useMemo(() => {
     if (!filterStudentTerm) {
