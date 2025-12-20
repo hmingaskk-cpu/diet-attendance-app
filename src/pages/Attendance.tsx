@@ -13,12 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Save, Copy, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { Student, AttendanceRecord } from "@/lib/db";
+import { Student, AttendanceRecord, getSubjects, Subject, getStudentsBySemester, getStudentsWithoutOptionalSubject } from "@/lib/db";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const Attendance = () => {
-  const { id } = useParams();
+  const { id } = useParams(); // id is semesterId
   const navigate = useNavigate();
   const { toast } = useToast();
   const [facultyName, setFacultyName] = useState("");
@@ -34,52 +34,122 @@ const Attendance = () => {
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [globalPeriodStatuses, setGlobalPeriodStatuses] = useState<Record<number, { status: 'taken-by-me' | 'taken-by-other' | undefined; abbreviation?: string | null }>>({});
   const [previousPeriodAttendance, setPreviousPeriodAttendance] = useState<Record<string, boolean>>({});
-  const [cachedAttendance, setCachedAttendance] = useState<any | null>(null); // New state for cached data
+  const [cachedAttendance, setCachedAttendance] = useState<any | null>(null);
+
+  // States for optional subjects
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("none"); // Initialize with "none"
+  const [otherSubjectsId, setOtherSubjectsId] = useState<string | null>(null); // To store the ID of 'Other Subjects'
 
   const isCurrentDate = date === today;
+  const isFourthSemester = parseInt(id || "0") === 4;
 
+  // Effect for fetching static data (semesters, subjects)
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchStaticData = async () => {
+      if (!id) return;
+
       try {
-        setIsLoading(true);
-        
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           navigate("/login");
           return;
         }
-        
         setFacultyId(user.id);
-        
+
         const { data: userDetails, error: userDetailsError } = await supabase
           .from('users')
           .select('name, role')
           .eq('id', user.id)
           .single();
-        
         if (userDetailsError) throw userDetailsError;
-        
         setFacultyName(userDetails?.name || "Faculty");
         setCurrentUserRole(userDetails?.role || "");
-        
+
         const { data: semesterData, error: semesterError } = await supabase
           .from('semesters')
           .select('name')
           .eq('id', id)
           .single();
-        
         if (semesterError) throw semesterError;
         setSemesterName(semesterData?.name || "");
-        
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('students')
-          .select('*')
-          .eq('semester_id', id)
-          .order('roll_number');
-        
-        if (studentsError) throw studentsError;
+
+        if (isFourthSemester) {
+          const subjectsData = await getSubjects();
+          
+          if (subjectsData && subjectsData.length > 0) {
+            setSubjects(subjectsData);
+            const otherSub = subjectsData.find(s => s.name === 'Other Subjects');
+            if (otherSub) {
+              setOtherSubjectsId(otherSub.id.toString());
+            }
+
+            // Set default selectedSubjectId to "none" on initial load for 4th semester
+            setSelectedSubjectId(prevSelectedSubjectId => {
+              if (prevSelectedSubjectId === "none" || !subjectsData.some(s => s.id.toString() === prevSelectedSubjectId)) {
+                return "none";
+              }
+              return prevSelectedSubjectId;
+            });
+          } else {
+            setSubjects([]);
+            setOtherSubjectsId(null);
+            setSelectedSubjectId("none");
+            toast({
+              title: "No Optional Subjects Found",
+              description: "Please ensure optional subjects (Maths, Science, English, Social Studies) are added to the 'subjects' table in Supabase.",
+              variant: "destructive",
+              duration: 7000,
+            });
+          }
+        } else {
+          setSubjects([]);
+          setOtherSubjectsId(null);
+          setSelectedSubjectId("none");
+        }
+      } catch (error: any) {
+        toast({
+          title: "Error loading initial data",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchStaticData();
+  }, [id, navigate, toast, isFourthSemester]);
+
+  // Effect for fetching dynamic data (students, attendance, period statuses)
+  useEffect(() => {
+    const fetchDynamicData = async () => {
+      if (!id || !facultyId) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        let studentsData: Student[] = [];
+        if (isFourthSemester) {
+          if (selectedSubjectId === "none") {
+            // "None" selected, fetch students without any optional subject assigned
+            studentsData = await getStudentsWithoutOptionalSubject(parseInt(id));
+          } else if (selectedSubjectId === otherSubjectsId) {
+            // "Other Subjects" selected, fetch all students for the 4th semester
+            studentsData = await getStudentsBySemester(parseInt(id));
+          } else {
+            // Specific optional subject selected, fetch students assigned to that subject
+            studentsData = await getStudentsBySemester(
+              parseInt(id),
+              parseInt(selectedSubjectId)
+            );
+          }
+        } else {
+          // Not 4th semester, fetch all students for the semester
+          studentsData = await getStudentsBySemester(parseInt(id));
+        }
         setStudents(studentsData || []);
-        
+
         const { data: allAttendanceToday, error: allAttendanceError } = await supabase
           .from('attendance_records')
           .select(`
@@ -89,13 +159,13 @@ const Attendance = () => {
           `)
           .eq('date', date)
           .eq('semester_id', id);
-        
+
         if (allAttendanceError) throw allAttendanceError;
-        
+
         const newGlobalPeriodStatuses: Record<number, { status: 'taken-by-me' | 'taken-by-other' | undefined; abbreviation?: string | null }> = {};
         allAttendanceToday?.forEach(record => {
           const abbreviation = (record.faculty as { abbreviation: string | null })?.abbreviation;
-          if (record.faculty_id === user.id) {
+          if (record.faculty_id === facultyId) {
             newGlobalPeriodStatuses[record.period] = { status: 'taken-by-me', abbreviation };
           } else {
             newGlobalPeriodStatuses[record.period] = { status: 'taken-by-other', abbreviation };
@@ -103,15 +173,14 @@ const Attendance = () => {
         });
         setGlobalPeriodStatuses(newGlobalPeriodStatuses);
 
-        // --- New Logic: Check for cached data first ---
-        const currentFacultyId = user.id;
-        const cachedKey = `cachedAttendance_${currentFacultyId}_${id}_${date}_${period}`;
+        // Check for cached data first
+        const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}_${selectedSubjectId || 'no_subject'}`;
         const storedCachedData = localStorage.getItem(cachedKey);
 
         if (storedCachedData) {
           const parsedCachedData = JSON.parse(storedCachedData);
           setCachedAttendance(parsedCachedData);
-          
+
           const cachedRecordsMap: Record<string, boolean> = {};
           parsedCachedData.records.forEach((record: any) => {
             cachedRecordsMap[record.student_id.toString()] = record.is_present;
@@ -143,22 +212,21 @@ const Attendance = () => {
           const periodStatus = newGlobalPeriodStatuses[currentPeriodNum];
 
           if (!(currentUserRole === 'admin' && periodStatus?.status === 'taken-by-other')) {
-            attendanceQuery = attendanceQuery.eq('faculty_id', user.id);
+            attendanceQuery = attendanceQuery.eq('faculty_id', facultyId);
           }
-          
+
           const { data: attendanceData, error: attendanceError } = await attendanceQuery;
-          
+
           if (attendanceError) throw attendanceError;
-          
+
           const initialAttendance: Record<string, boolean> = {};
           attendanceData?.forEach(record => {
             initialAttendance[record.student_id.toString()] = record.is_present;
           });
-          
+
           setAttendance(initialAttendance);
           setCachedAttendance(null); // Ensure cachedAttendance is null if no cache
         }
-        // --- End New Logic ---
 
         if (parseInt(period) > 1) {
           const previousPeriodNum = parseInt(period) - 1;
@@ -171,7 +239,7 @@ const Attendance = () => {
             .eq('date', date)
             .eq('period', previousPeriodNum)
             .eq('semester_id', id);
-          
+
           if (prevPeriodError) throw prevPeriodError;
 
           const prevAttendanceMap: Record<string, boolean> = {};
@@ -185,7 +253,7 @@ const Attendance = () => {
 
       } catch (error: any) {
         toast({
-          title: "Error loading data",
+          title: "Error loading attendance data",
           description: error.message,
           variant: "destructive"
         });
@@ -193,11 +261,9 @@ const Attendance = () => {
         setIsLoading(false);
       }
     };
-    
-    if (id) {
-      fetchData();
-    }
-  }, [id, date, period, navigate, toast, currentUserRole]);
+
+    fetchDynamicData();
+  }, [id, date, period, facultyId, currentUserRole, isFourthSemester, selectedSubjectId, otherSubjectsId, toast]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -226,7 +292,7 @@ const Attendance = () => {
     }
 
     setAttendance(previousPeriodAttendance);
-    
+
     const allPresentInPrevious = students.every(student => previousPeriodAttendance[student.id.toString()] === true);
     setSelectAll(allPresentInPrevious);
 
@@ -284,7 +350,7 @@ const Attendance = () => {
         .eq('date', date)
         .eq('period', period)
         .eq('semester_id', id);
-      
+
       if (currentUserRole !== 'admin') {
         deleteQuery = deleteQuery.eq('faculty_id', facultyId);
       }
@@ -299,7 +365,7 @@ const Attendance = () => {
       if (insertError) throw insertError;
 
       // If successful, clear cached data
-      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}`;
+      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}_${selectedSubjectId || 'no_subject'}`;
       localStorage.removeItem(cachedKey);
       setCachedAttendance(null);
 
@@ -335,6 +401,7 @@ const Attendance = () => {
             semesterName,
             facultyName,
             studentsAttendance: studentsForExport,
+            optionalSubject: isFourthSemester && selectedSubjectId !== "none" ? subjects.find(s => s.id.toString() === selectedSubjectId)?.name : undefined,
           };
 
           const { data: { session } } = await supabase.auth.getSession();
@@ -366,7 +433,7 @@ const Attendance = () => {
             title: "Google Sheets Exported",
             description: "Attendance data has been exported to Google Sheets.",
           });
-          
+
         } catch (exportInvokeError: any) {
           console.error("Unexpected error during Edge Function invocation:", exportInvokeError);
           toast({
@@ -379,7 +446,7 @@ const Attendance = () => {
 
     } catch (error: any) {
       console.error("Error saving attendance:", error);
-      
+
       // Construct cached data object
       const cachedData = {
         date,
@@ -395,7 +462,7 @@ const Attendance = () => {
           is_present: attendance[student.id.toString()] ?? false
         }))
       };
-      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}`;
+      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}_${selectedSubjectId || 'no_subject'}`;
       localStorage.setItem(cachedKey, JSON.stringify(cachedData));
       setCachedAttendance(cachedData);
 
@@ -436,7 +503,7 @@ const Attendance = () => {
       if (error) throw error;
 
       // Clear cached data if it exists for this period
-      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}`;
+      const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}_${selectedSubjectId || 'no_subject'}`;
       localStorage.removeItem(cachedKey);
       setCachedAttendance(null);
 
@@ -464,9 +531,14 @@ const Attendance = () => {
     }
   };
 
-  const isSubmitDisabled = globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole !== 'admin';
+  // Determine if the student list is empty due to filtering (e.g., no students for selected subject)
+  const isStudentListEmpty = students.length === 0;
+
+  // Determine if submission/deletion should be disabled
+  const isPeriodTakenByOtherFaculty = globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole !== 'admin';
+  const isSubmitDisabled = isPeriodTakenByOtherFaculty || isStudentListEmpty;
   const currentPeriodStatus = globalPeriodStatuses[parseInt(period)];
-  const isDeleteDisabled = !currentPeriodStatus || (currentPeriodStatus.status === 'taken-by-other' && currentUserRole !== 'admin');
+  const isDeleteDisabled = !currentPeriodStatus || isPeriodTakenByOtherFaculty || isStudentListEmpty;
 
 
   if (isLoading) {
@@ -535,8 +607,8 @@ const Attendance = () => {
                       }
 
                       return (
-                        <SelectItem 
-                          key={p} 
+                        <SelectItem
+                          key={p}
                           value={p.toString()}
                           className={itemClassName}
                         >
@@ -561,7 +633,37 @@ const Attendance = () => {
                 </div>
               </div>
             </div>
-            {isSubmitDisabled && (
+            {isFourthSemester && (
+              <div className="space-y-2">
+                <Label htmlFor="subject">Select Subject</Label> {/* Renamed title */}
+                <Select
+                  value={selectedSubjectId}
+                  onValueChange={setSelectedSubjectId}
+                  disabled={subjects.length === 0 && selectedSubjectId !== "none"}
+                >
+                  <SelectTrigger id="subject">
+                    <SelectValue placeholder="Select subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (Students without optional subject)</SelectItem>
+                    {subjects.map(subject => (
+                      <SelectItem key={subject.id} value={subject.id.toString()}>
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {subjects.length === 0 && selectedSubjectId !== "none" && (
+                  <p className="text-sm text-gray-500">No subjects available (except 'None').</p>
+                )}
+                {selectedSubjectId === "none" && subjects.length > 0 && (
+                  <p className="text-sm text-gray-500">
+                    Selecting "None" will display all 4th-semester students who do not have an optional subject assigned.
+                  </p>
+                )}
+              </div>
+            )}
+            {isPeriodTakenByOtherFaculty && (
               <p className="text-destructive text-sm mt-2">
                 Attendance for Period {period} on {date} has already been submitted by another faculty member. You cannot modify it.
               </p>
@@ -588,7 +690,7 @@ const Attendance = () => {
                   <Button
                     variant="outline"
                     onClick={handleCopyFromPrevious}
-                    disabled={isSubmitDisabled || Object.keys(previousPeriodAttendance).length === 0}
+                    disabled={isSubmitDisabled || Object.keys(previousPeriodAttendance).length === 0 || isStudentListEmpty}
                   >
                     <Copy className="mr-2 h-4 w-4" />
                     Copy from Period {parseInt(period) - 1}
@@ -597,14 +699,14 @@ const Attendance = () => {
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(true)}
-                  disabled={isSubmitDisabled}
+                  disabled={isSubmitDisabled || isStudentListEmpty}
                 >
                   Select All Present
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => handleSelectAll(false)}
-                  disabled={isSubmitDisabled}
+                  disabled={isSubmitDisabled || isStudentListEmpty}
                 >
                   Select All Absent
                 </Button>
@@ -612,50 +714,62 @@ const Attendance = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectAll}
-                      onCheckedChange={handleSelectAll}
-                      disabled={isSubmitDisabled}
-                    />
-                  </TableHead>
-                  <TableHead>Roll No.</TableHead>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
+            {isStudentListEmpty ? (
+              <div className="text-center p-8 text-gray-500">
+                {isFourthSemester && selectedSubjectId === "none"
+                  ? "No 4th-semester students found without an optional subject assigned."
+                  : isFourthSemester && selectedSubjectId === otherSubjectsId
+                    ? "No 4th-semester students found."
+                    : isFourthSemester && selectedSubjectId !== "none"
+                      ? `No students found for the selected subject.`
+                      : "No students found for this semester."}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
                       <Checkbox
-                        checked={attendance[student.id.toString()] || false}
-                        onCheckedChange={(checked) => 
-                          handleAttendanceChange(student.id.toString(), checked as boolean)
-                        }
+                        checked={selectAll}
+                        onCheckedChange={handleSelectAll}
                         disabled={isSubmitDisabled}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{student.roll_number}</Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell className="text-right">
-                      {attendance[student.id.toString()] === true ? (
-                        <Badge>Present</Badge>
-                      ) : attendance[student.id.toString()] === false ? (
-                        <Badge variant="destructive">Absent</Badge>
-                      ) : (
-                        <Badge variant="secondary">Not Marked</Badge>
-                      )}
-                    </TableCell>
+                    </TableHead>
+                    <TableHead>Roll No.</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {students.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={attendance[student.id.toString()] || false}
+                          onCheckedChange={(checked) =>
+                            handleAttendanceChange(student.id.toString(), checked as boolean)
+                          }
+                          disabled={isSubmitDisabled}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{student.roll_number}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell className="text-right">
+                        {attendance[student.id.toString()] === true ? (
+                          <Badge>Present</Badge>
+                        ) : attendance[student.id.toString()] === false ? (
+                          <Badge variant="destructive">Absent</Badge>
+                        ) : (
+                          <Badge variant="secondary">Not Marked</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
