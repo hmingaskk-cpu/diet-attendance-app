@@ -156,6 +156,64 @@ export interface Database {
           }
         ]
       }
+      subjects: {
+        Row: {
+          id: number
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      student_subjects: {
+        Row: {
+          id: number
+          student_id: number
+          subject_id: number
+          semester_id: number
+        }
+        Insert: {
+          id?: number
+          student_id: number
+          subject_id: number
+          semester_id: number
+        }
+        Update: {
+          id?: number
+          student_id?: number
+          subject_id?: number
+          semester_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_subjects_student_id_fkey"
+            columns: ["student_id"]
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_subjects_subject_id_fkey"
+            columns: ["subject_id"]
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_subjects_semester_id_fkey"
+            columns: ["semester_id"]
+            referencedRelation: "semesters"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
