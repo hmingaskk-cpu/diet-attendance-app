@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { updateStudent, getSemesters, Semester, Student } from "@/lib/db";
+import { updateStudent, getSemesters, Semester, Student, getSubjects, Subject, getStudentOptionalSubject, assignStudentOptionalSubject, removeStudentOptionalSubject } from "@/lib/db";
 import { supabase } from "@/lib/supabaseClient";
 
 import { useForm } from "react-hook-form";
@@ -20,6 +20,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 
 const editStudentFormSchema = z.object({
@@ -39,6 +40,7 @@ const editStudentFormSchema = z.object({
   semesterId: z.string().min(1, {
     message: "Please select a semester.",
   }),
+  optionalSubjectId: z.string().optional(), // New field for optional subject
 });
 
 type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
@@ -52,6 +54,7 @@ interface EditStudentDialogProps {
 
 const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditStudentDialogProps) => {
   const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]); // New state for subjects
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -62,36 +65,68 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
       rollNumber: "",
       email: "",
       semesterId: "",
+      optionalSubjectId: "",
     },
   });
 
+  const selectedSemester = form.watch("semesterId");
+
   useEffect(() => {
-    const fetchSemesters = async () => {
-      const { data, error } = await supabase
+    const fetchData = async () => {
+      const { data: semestersData, error: semestersError } = await supabase
         .from('semesters')
         .select('*')
         .order('id');
       
-      if (error) {
+      if (semestersError) {
         toast({
           title: "Error fetching semesters",
-          description: error.message,
+          description: semestersError.message,
           variant: "destructive"
         });
       } else {
-        setSemesters(data || []);
+        setSemesters(semestersData || []);
+      }
+
+      const { data: subjectsData, error: subjectsError } = await supabase
+        .from('subjects')
+        .select('*')
+        .order('name');
+
+      if (subjectsError) {
+        toast({
+          title: "Error fetching subjects",
+          description: subjectsError.message,
+          variant: "destructive"
+        });
+      } else {
+        setSubjects(subjectsData || []);
       }
     };
     
     if (isOpen) {
-      fetchSemesters();
+      fetchData();
       if (student) {
         form.reset({
           name: student.name,
           rollNumber: student.roll_number,
           email: student.email || "",
           semesterId: student.semester_id.toString(),
+          optionalSubjectId: "", // Reset optional subject initially
         });
+
+        // Fetch optional subject if student is in 4th semester
+        if (student.semester_id === 4) {
+          getStudentOptionalSubject(student.id, 4).then(subjectId => {
+            form.setValue("optionalSubjectId", subjectId ? subjectId.toString() : "");
+          }).catch(error => {
+            toast({
+              title: "Error fetching optional subject",
+              description: error.message,
+              variant: "destructive"
+            });
+          });
+        }
       }
     }
   }, [isOpen, student, toast, form]);
@@ -109,6 +144,25 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
         semester_id: parseInt(values.semesterId),
         updated_at: new Date().toISOString(),
       });
+
+      // Handle optional subject assignment only for 4th semester
+      if (parseInt(values.semesterId) === 4) {
+        if (values.optionalSubjectId) {
+          await assignStudentOptionalSubject(student.id, parseInt(values.optionalSubjectId), 4);
+        } else {
+          // If no subject selected but one was previously assigned, remove it
+          const currentOptionalSubject = await getStudentOptionalSubject(student.id, 4);
+          if (currentOptionalSubject) {
+            await removeStudentOptionalSubject(student.id, 4);
+          }
+        }
+      } else {
+        // If student is moved out of 4th semester, remove any optional subject assignment
+        const currentOptionalSubject = await getStudentOptionalSubject(student.id, 4);
+        if (currentOptionalSubject) {
+          await removeStudentOptionalSubject(student.id, 4);
+        }
+      }
 
       toast({
         title: "Student Updated",
@@ -129,7 +183,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Student</DialogTitle>
           <DialogDescription>
@@ -212,8 +266,38 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                   </FormItem>
                 )}
               />
+              {parseInt(selectedSemester) === 4 && (
+                <FormField
+                  control={form.control}
+                  name="optionalSubjectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Optional Subject (4th Semester)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select optional subject" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem> {/* Option to unassign */}
+                          {subjects.map(subject => (
+                            <SelectItem key={subject.id} value={subject.id.toString()}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Assign an optional subject for this 4th-semester student.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save Changes"}
               </Button>
