@@ -65,7 +65,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
       rollNumber: "",
       email: "",
       semesterId: "",
-      optionalSubjectId: "",
+      optionalSubjectId: "none", // Default to "none" for the Select component
     },
   });
 
@@ -112,13 +112,14 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
           rollNumber: student.roll_number,
           email: student.email || "",
           semesterId: student.semester_id.toString(),
-          optionalSubjectId: "", // Reset optional subject initially
+          optionalSubjectId: "none", // Reset optional subject initially to "none"
         });
 
         // Fetch optional subject if student is in 4th semester
         if (student.semester_id === 4) {
           getStudentOptionalSubject(student.id, 4).then(subjectId => {
-            form.setValue("optionalSubjectId", subjectId ? subjectId.toString() : "");
+            // Set to "none" if null, otherwise toString()
+            form.setValue("optionalSubjectId", subjectId ? subjectId.toString() : "none");
           }).catch(error => {
             toast({
               title: "Error fetching optional subject",
@@ -147,10 +148,11 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
 
       // Handle optional subject assignment only for 4th semester
       if (parseInt(values.semesterId) === 4) {
-        if (values.optionalSubjectId) {
+        // If optionalSubjectId is "none", it means "None" was selected
+        if (values.optionalSubjectId !== "none") {
           await assignStudentOptionalSubject(student.id, parseInt(values.optionalSubjectId), 4);
         } else {
-          // If no subject selected but one was previously assigned, remove it
+          // If "none" selected, remove any existing assignment
           const currentOptionalSubject = await getStudentOptionalSubject(student.id, 4);
           if (currentOptionalSubject) {
             await removeStudentOptionalSubject(student.id, 4);
@@ -280,7 +282,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem> {/* Option to unassign */}
+                          <SelectItem value="none">None</SelectItem> {/* Changed value to "none" */}
                           {subjects.map(subject => (
                             <SelectItem key={subject.id} value={subject.id.toString()}>
                               {subject.name}
