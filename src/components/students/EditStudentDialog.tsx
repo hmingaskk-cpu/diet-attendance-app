@@ -2,12 +2,32 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { updateStudent, getSemesters, Semester, Student, getSubjects, Subject, getStudentOptionalSubject, assignStudentOptionalSubject, removeStudentOptionalSubject } from "@/lib/db";
+import {
+  updateStudent,
+  Semester,
+  Student,
+  Subject,
+  getStudentOptionalSubject,
+  assignStudentOptionalSubject,
+  removeStudentOptionalSubject,
+} from "@/lib/db";
 import { supabase } from "@/lib/supabaseClient";
 
 import { useForm } from "react-hook-form";
@@ -23,24 +43,14 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 
+/* ---------------------------- Schema ---------------------------- */
+
 const editStudentFormSchema = z.object({
-  name: z.string().min(2, {
-    message: "Student name must be at least 2 characters.",
-  }).max(100, {
-    message: "Student name must not be longer than 100 characters.",
-  }),
-  rollNumber: z.string().min(1, {
-    message: "Roll number is required.",
-  }).max(20, {
-    message: "Roll number must not be longer than 20 characters.",
-  }),
-  email: z.string().email({
-    message: "Please enter a valid email address.",
-  }).optional().or(z.literal("")), // Allow empty string for optional email
-  semesterId: z.string().min(1, {
-    message: "Please select a semester.",
-  }),
-  optionalSubjectId: z.string().optional(), // New field for optional subject
+  name: z.string().min(2).max(100),
+  rollNumber: z.string().min(1).max(20),
+  email: z.string().email().optional().or(z.literal("")),
+  semesterId: z.string().min(1),
+  optionalSubjectId: z.string().optional(),
 });
 
 type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
@@ -52,11 +62,19 @@ interface EditStudentDialogProps {
   onStudentUpdated: () => void;
 }
 
-const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditStudentDialogProps) => {
-  const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]); // New state for subjects
-  const [isLoading, setIsLoading] = useState(false);
+/* ---------------------------- Component ---------------------------- */
+
+const EditStudentDialog = ({
+  isOpen,
+  onClose,
+  student,
+  onStudentUpdated,
+}: EditStudentDialogProps) => {
   const { toast } = useToast();
+
+  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<EditStudentFormValues>({
     resolver: zodResolver(editStudentFormSchema),
@@ -65,72 +83,52 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
       rollNumber: "",
       email: "",
       semesterId: "",
-      optionalSubjectId: "none", // Default to "none" for the Select component
+      optionalSubjectId: "none",
     },
   });
 
   const selectedSemester = form.watch("semesterId");
 
+  /* ---------------------------- Fetch Data ---------------------------- */
+
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: semestersData, error: semestersError } = await supabase
-        .from('semesters')
-        .select('*')
-        .order('id');
-      
-      if (semestersError) {
-        toast({
-          title: "Error fetching semesters",
-          description: semestersError.message,
-          variant: "destructive"
-        });
-      } else {
-        setSemesters(semestersData || []);
-      }
+    if (!isOpen || !student) return;
 
-      const { data: subjectsData, error: subjectsError } = await supabase
-        .from('subjects')
-        .select('*')
-        .order('name');
+    const loadData = async () => {
+      const { data: semesterData } = await supabase
+        .from("semesters")
+        .select("*")
+        .order("id");
 
-      if (subjectsError) {
-        toast({
-          title: "Error fetching subjects",
-          description: subjectsError.message,
-          variant: "destructive"
-        });
-      } else {
-        setSubjects(subjectsData || []);
+      const { data: subjectData } = await supabase
+        .from("subjects")
+        .select("*")
+        .order("name");
+
+      setSemesters(semesterData || []);
+      setSubjects(subjectData || []);
+
+      form.reset({
+        name: student.name,
+        rollNumber: student.roll_number,
+        email: student.email || "",
+        semesterId: student.semester_id.toString(),
+        optionalSubjectId: "none",
+      });
+
+      if (student.semester_id === 4) {
+        const currentSubject = await getStudentOptionalSubject(student.id, 4);
+        form.setValue(
+          "optionalSubjectId",
+          currentSubject ? currentSubject.toString() : "none"
+        );
       }
     };
-    
-    if (isOpen) {
-      fetchData();
-      if (student) {
-        form.reset({
-          name: student.name,
-          rollNumber: student.roll_number,
-          email: student.email || "",
-          semesterId: student.semester_id.toString(),
-          optionalSubjectId: "none", // Reset optional subject initially to "none"
-        });
 
-        // Fetch optional subject if student is in 4th semester
-        if (student.semester_id === 4) {
-          getStudentOptionalSubject(student.id, 4).then(subjectId => {
-            // Set to "none" if null, otherwise toString()
-            form.setValue("optionalSubjectId", subjectId ? subjectId.toString() : "none");
-          }).catch(error => {
-            toast({
-              title: "Error fetching optional subject",
-              description: error.message,
-              variant: "destructive"
-            });
-          });
-        }
-      }
-    }
-  }, [isOpen, student, toast, form]);
+    loadData();
+  }, [isOpen, student, form]);
+
+  /* ---------------------------- Submit ---------------------------- */
 
   const onSubmit = async (values: EditStudentFormValues) => {
     if (!student) return;
@@ -138,6 +136,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
     setIsLoading(true);
 
     try {
+      /* -------- Update student basic data -------- */
       await updateStudent(student.id, {
         name: values.name,
         roll_number: values.rollNumber,
@@ -146,42 +145,53 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
         updated_at: new Date().toISOString(),
       });
 
-      // Handle optional subject assignment only for 4th semester
-      if (parseInt(values.semesterId) === 4) {
-        // If optionalSubjectId is "none", it means "None" was selected
-        if (values.optionalSubjectId !== "none") {
-          await assignStudentOptionalSubject(student.id, parseInt(values.optionalSubjectId), 4);
-        } else {
-          // If "none" selected, remove any existing assignment
-          const currentOptionalSubject = await getStudentOptionalSubject(student.id, 4);
-          if (currentOptionalSubject) {
+      /* -------- Optional subject logic -------- */
+      const semesterId = parseInt(values.semesterId);
+      const selectedOptional = values.optionalSubjectId;
+      const existingOptional = await getStudentOptionalSubject(student.id, 4);
+
+      if (semesterId === 4) {
+        if (selectedOptional === "none") {
+          if (existingOptional) {
             await removeStudentOptionalSubject(student.id, 4);
           }
+        } else {
+          const newSubjectId = parseInt(selectedOptional);
+
+          if (!existingOptional) {
+            await assignStudentOptionalSubject(student.id, newSubjectId, 4);
+          } else if (existingOptional !== newSubjectId) {
+            await removeStudentOptionalSubject(student.id, 4);
+            await assignStudentOptionalSubject(student.id, newSubjectId, 4);
+          }
+          // same subject → do nothing
         }
       } else {
-        // If student is moved out of 4th semester, remove any optional subject assignment
-        const currentOptionalSubject = await getStudentOptionalSubject(student.id, 4);
-        if (currentOptionalSubject) {
+        // Leaving 4th semester → cleanup
+        if (existingOptional) {
           await removeStudentOptionalSubject(student.id, 4);
         }
       }
 
       toast({
         title: "Student Updated",
-        description: `${values.name}'s details have been updated successfully.`,
+        description: "Student details updated successfully.",
       });
+
       onStudentUpdated();
       onClose();
-    } catch (error: any) {
+    } catch (err: any) {
       toast({
-        title: "Error updating student",
-        description: error.message,
-        variant: "destructive"
+        title: "Update failed",
+        description: err.message,
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
+
+  /* ---------------------------- UI ---------------------------- */
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -189,9 +199,10 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
         <DialogHeader>
           <DialogTitle>Edit Student</DialogTitle>
           <DialogDescription>
-            Update the details for {student?.name}. Click save when you're done.
+            Update details for {student?.name}
           </DialogDescription>
         </DialogHeader>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="grid gap-4 py-4">
@@ -200,17 +211,15 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Student Name</FormLabel>
+                    <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="John Doe"
-                        {...field}
-                      />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="rollNumber"
@@ -218,48 +227,43 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                   <FormItem>
                     <FormLabel>Roll Number</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="DIET/2023/001"
-                        {...field}
-                      />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email (Optional)</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="john.doe@example.com"
-                        {...field}
-                      />
+                      <Input type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="semesterId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Semester</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select semester" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {semesters.map(semester => (
-                          <SelectItem key={semester.id} value={semester.id.toString()}>
-                            {semester.name}
+                        {semesters.map((s) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>
+                            {s.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -268,30 +272,31 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                   </FormItem>
                 )}
               />
+
               {parseInt(selectedSemester) === 4 && (
                 <FormField
                   control={form.control}
                   name="optionalSubjectId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Optional Subject (4th Semester)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <FormLabel>Optional Subject</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select optional subject" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem> {/* Changed value to "none" */}
-                          {subjects.map(subject => (
-                            <SelectItem key={subject.id} value={subject.id.toString()}>
-                              {subject.name}
+                          <SelectItem value="none">None</SelectItem>
+                          {subjects.map((s) => (
+                            <SelectItem key={s.id} value={s.id.toString()}>
+                              {s.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       <FormDescription>
-                        Assign an optional subject for this 4th-semester student.
+                        Only applicable for 4th semester students
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -299,7 +304,8 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                 />
               )}
             </div>
-            <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
+
+            <DialogFooter>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save Changes"}
               </Button>
