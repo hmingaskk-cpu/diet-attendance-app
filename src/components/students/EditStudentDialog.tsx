@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { updateStudent, getSemesters, Semester, Student, getSubjects, Subject, getStudentOptionalSubject, assignStudentOptionalSubject, removeStudentOptionalSubject } from "@/lib/db";
+import { updateStudent, getSemesters, Semester, Student, getSubjects, Subject, removeStudentOptionalSubject } from "@/lib/db";
 import { supabase } from "@/lib/supabaseClient";
 
 import { useForm } from "react-hook-form";
@@ -36,11 +36,11 @@ const editStudentFormSchema = z.object({
   }),
   email: z.string().email({
     message: "Please enter a valid email address.",
-  }).optional().or(z.literal("")), // Allow empty string for optional email
+  }).optional().or(z.literal("")),
   semesterId: z.string().min(1, {
     message: "Please select a semester.",
   }),
-  optionalSubjectId: z.string().optional(), // New field for optional subject
+  optionalSubjectId: z.string().optional(),
 });
 
 type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
@@ -54,7 +54,7 @@ interface EditStudentDialogProps {
 
 const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditStudentDialogProps) => {
   const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]); // New state for subjects
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -65,7 +65,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
       rollNumber: "",
       email: "",
       semesterId: "",
-      optionalSubjectId: "none", // Default to "none" for the Select component
+      optionalSubjectId: "none",
     },
   });
 
@@ -112,21 +112,25 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
           rollNumber: student.roll_number,
           email: student.email || "",
           semesterId: student.semester_id.toString(),
-          optionalSubjectId: "none", // Reset optional subject initially to "none"
+          optionalSubjectId: "none",
         });
 
         // Fetch optional subject if student is in 4th semester
         if (student.semester_id === 4) {
-          getStudentOptionalSubject(student.id, 4).then(subjectId => {
-            // Set to "none" if null, otherwise toString()
-            form.setValue("optionalSubjectId", subjectId ? subjectId.toString() : "none");
-          }).catch(error => {
-            toast({
-              title: "Error fetching optional subject",
-              description: error.message,
-              variant: "destructive"
+          // We use raw supabase here to ensure we get the data regardless of library logic filters
+          supabase
+            .from('student_subjects') // VERIFY THIS TABLE NAME
+            .select('subject_id')
+            .eq('student_id', student.id)
+            .eq('semester_id', 4)
+            .maybeSingle()
+            .then(({ data, error }) => {
+               if (!error && data) {
+                 form.setValue("optionalSubjectId", data.subject_id.toString());
+               } else {
+                 form.setValue("optionalSubjectId", "none");
+               }
             });
-          });
         }
       }
     }
@@ -138,6 +142,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
     setIsLoading(true);
 
     try {
+      // 1. Update core student details
       await updateStudent(student.id, {
         name: values.name,
         roll_number: values.rollNumber,
@@ -146,26 +151,31 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
         updated_at: new Date().toISOString(),
       });
 
-      // Handle optional subject assignment only for 4th semester
+      // 2. Handle Optional Subject Logic
       if (parseInt(values.semesterId) === 4) {
-        // FIX: Always remove the existing assignment first to avoid duplicate key constraint violations
-        // when switching from one subject to another.
-        const currentOptionalSubject = await getStudentOptionalSubject(student.id, 4);
-        if (currentOptionalSubject) {
+        if (values.optionalSubjectId === "none") {
+          // User selected "None": Remove the assignment
+          // We blindly remove to ensure cleanup even if we couldn't "see" the row earlier
           await removeStudentOptionalSubject(student.id, 4);
-        }
+        } else {
+          // User selected a Subject: Use UPSERT
+          // This updates the existing row if found (avoiding duplicate key errors)
+          // or inserts a new one if it doesn't exist.
+          const { error: upsertError } = await supabase
+            .from('student_subjects') // VERIFY THIS TABLE NAME MATCHES YOUR DB
+            .upsert({
+              student_id: student.id,
+              semester_id: 4,
+              subject_id: parseInt(values.optionalSubjectId)
+            }, {
+              onConflict: 'student_id,semester_id' // VERIFY THIS MATCHES YOUR UNIQUE CONSTRAINT
+            });
 
-        // If the user selected a specific subject (not "none"), assign it.
-        // Since we removed the old one above, this will insert cleanly.
-        if (values.optionalSubjectId !== "none") {
-          await assignStudentOptionalSubject(student.id, parseInt(values.optionalSubjectId), 4);
+          if (upsertError) throw upsertError;
         }
       } else {
-        // If student is moved out of 4th semester, remove any optional subject assignment
-        const currentOptionalSubject = await getStudentOptionalSubject(student.id, 4);
-        if (currentOptionalSubject) {
-          await removeStudentOptionalSubject(student.id, 4);
-        }
+        // Student moved out of 4th semester: Cleanup any assignment
+        await removeStudentOptionalSubject(student.id, 4);
       }
 
       toast({
@@ -175,9 +185,10 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
       onStudentUpdated();
       onClose();
     } catch (error: any) {
+      console.error(error);
       toast({
         title: "Error updating student",
-        description: error.message,
+        description: error.message || "An unexpected error occurred.",
         variant: "destructive"
       });
     } finally {
@@ -204,10 +215,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                   <FormItem>
                     <FormLabel>Student Name</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="John Doe"
-                        {...field}
-                      />
+                      <Input placeholder="John Doe" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -220,10 +228,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                   <FormItem>
                     <FormLabel>Roll Number</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="DIET/2023/001"
-                        {...field}
-                      />
+                      <Input placeholder="DIET/2023/001" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -236,11 +241,7 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                   <FormItem>
                     <FormLabel>Email (Optional)</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="john.doe@example.com"
-                        {...field}
-                      />
+                      <Input type="email" placeholder="john.doe@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
