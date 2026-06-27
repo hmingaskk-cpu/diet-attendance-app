@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { updateStudent, getSemesters, Semester, Student, getSubjects, Subject, removeStudentOptionalSubject } from "@/lib/db";
+import { updateStudent, Semester, Student, Subject } from "@/lib/db";
 import { supabase } from "@/lib/supabaseClient";
 
 import { useForm } from "react-hook-form";
@@ -40,7 +40,9 @@ const editStudentFormSchema = z.object({
   semesterId: z.string().min(1, {
     message: "Please select a semester.",
   }),
-  optionalSubjectId: z.string().optional(),
+  optionalSubject4th: z.string().optional().default("none"),
+  optionalSubject2nd_1: z.string().optional().default("none"),
+  optionalSubject2nd_2: z.string().optional().default("none"),
 });
 
 type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
@@ -65,80 +67,71 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
       rollNumber: "",
       email: "",
       semesterId: "",
-      optionalSubjectId: "none",
+      optionalSubject4th: "none",
+      optionalSubject2nd_1: "none",
+      optionalSubject2nd_2: "none",
     },
   });
 
   const selectedSemester = form.watch("semesterId");
+  const isSecondSemester = selectedSemester === "2";
+  const isFourthSemester = selectedSemester === "4";
+
+  const secondSemSubjects = subjects.filter(s => 
+    ['english', 'mizo', 'mathematics', 'evs', 'science', 'ss', 'other subjects'].includes(s.name.toLowerCase())
+  );
+  
+  const fourthSemSubjects = subjects.filter(s => 
+    ['maths', 'science', 'english', 'social studies', 'other subjects'].includes(s.name.toLowerCase())
+  );
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: semestersData, error: semestersError } = await supabase
-        .from('semesters')
-        .select('*')
-        .order('id');
-      
-      if (semestersError) {
-        toast({
-          title: "Error fetching semesters",
-          description: semestersError.message,
-          variant: "destructive"
-        });
-      } else {
-        setSemesters(semestersData || []);
-      }
+      const { data: semestersData } = await supabase.from('semesters').select('*').order('id');
+      if (semestersData) setSemesters(semestersData);
 
-      const { data: subjectsData, error: subjectsError } = await supabase
-        .from('subjects')
-        .select('*')
-        .order('name');
-
-      if (subjectsError) {
-        toast({
-          title: "Error fetching subjects",
-          description: subjectsError.message,
-          variant: "destructive"
-        });
-      } else {
-        setSubjects(subjectsData || []);
-      }
+      const { data: subjectsData } = await supabase.from('subjects').select('*').order('name');
+      if (subjectsData) setSubjects(subjectsData);
     };
     
     if (isOpen) {
       fetchData();
       if (student) {
+        // Preset basic values
         form.reset({
           name: student.name,
           rollNumber: student.roll_number,
           email: student.email || "",
           semesterId: student.semester_id.toString(),
-          optionalSubjectId: "none",
+          optionalSubject4th: "none",
+          optionalSubject2nd_1: "none",
+          optionalSubject2nd_2: "none",
         });
 
-        // Fetch optional subject if student is in 4th semester
-        if (student.semester_id === 4) {
-          // We use raw supabase here to ensure we get the data regardless of library logic filters
+        // Load existing subjects if they are in 2nd or 4th sem
+        if (student.semester_id === 2 || student.semester_id === 4) {
           supabase
-            .from('student_subjects') // VERIFY THIS TABLE NAME
+            .from('student_subjects')
             .select('subject_id')
             .eq('student_id', student.id)
-            .eq('semester_id', 4)
-            .maybeSingle()
+            .eq('semester_id', student.semester_id)
             .then(({ data, error }) => {
-               if (!error && data) {
-                 form.setValue("optionalSubjectId", data.subject_id.toString());
-               } else {
-                 form.setValue("optionalSubjectId", "none");
+               if (!error && data && data.length > 0) {
+                 if (student.semester_id === 4) {
+                   form.setValue("optionalSubject4th", data[0].subject_id.toString());
+                 } else if (student.semester_id === 2) {
+                   form.setValue("optionalSubject2nd_1", data[0]?.subject_id.toString() || "none");
+                   form.setValue("optionalSubject2nd_2", data[1]?.subject_id.toString() || "none");
+                 }
                }
             });
         }
       }
     }
-  }, [isOpen, student, toast, form]);
+  }, [isOpen, student, form]);
 
   const onSubmit = async (values: EditStudentFormValues) => {
     if (!student) return;
-
     setIsLoading(true);
 
     try {
@@ -151,31 +144,31 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
         updated_at: new Date().toISOString(),
       });
 
-      // 2. Handle Optional Subject Logic
-      if (parseInt(values.semesterId) === 4) {
-        if (values.optionalSubjectId === "none") {
-          // User selected "None": Remove the assignment
-          // We blindly remove to ensure cleanup even if we couldn't "see" the row earlier
-          await removeStudentOptionalSubject(student.id, 4);
-        } else {
-          // User selected a Subject: Use UPSERT
-          // This updates the existing row if found (avoiding duplicate key errors)
-          // or inserts a new one if it doesn't exist.
-          const { error: upsertError } = await supabase
-            .from('student_subjects') // VERIFY THIS TABLE NAME MATCHES YOUR DB
-            .upsert({
-              student_id: student.id,
-              semester_id: 4,
-              subject_id: parseInt(values.optionalSubjectId)
-            }, {
-              onConflict: 'student_id,semester_id' // VERIFY THIS MATCHES YOUR UNIQUE CONSTRAINT
-            });
+      // 2. Clear ALL existing subjects for this student to prevent duplicate conflict errors
+      await supabase.from('student_subjects').delete().eq('student_id', student.id);
 
-          if (upsertError) throw upsertError;
+      // 3. Assign new Optional Subjects 
+      const subjectInserts: { student_id: number, semester_id: number, subject_id: number }[] = [];
+
+      if (isSecondSemester) {
+        // Use a Set to make sure we don't accidentally try to insert the exact same subject twice
+        const uniqueSubjects = new Set<string>();
+        if (values.optionalSubject2nd_1 && values.optionalSubject2nd_1 !== "none") uniqueSubjects.add(values.optionalSubject2nd_1);
+        if (values.optionalSubject2nd_2 && values.optionalSubject2nd_2 !== "none") uniqueSubjects.add(values.optionalSubject2nd_2);
+        
+        uniqueSubjects.forEach(subId => {
+          subjectInserts.push({ student_id: student.id, semester_id: 2, subject_id: parseInt(subId) });
+        });
+      } else if (isFourthSemester) {
+        if (values.optionalSubject4th && values.optionalSubject4th !== "none") {
+          subjectInserts.push({ student_id: student.id, semester_id: 4, subject_id: parseInt(values.optionalSubject4th) });
         }
-      } else {
-        // Student moved out of 4th semester: Cleanup any assignment
-        await removeStudentOptionalSubject(student.id, 4);
+      }
+
+      // 4. Save to database
+      if (subjectInserts.length > 0) {
+        const { error: insertError } = await supabase.from('student_subjects').insert(subjectInserts);
+        if (insertError) throw insertError;
       }
 
       toast({
@@ -271,13 +264,62 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                   </FormItem>
                 )}
               />
-              {parseInt(selectedSemester) === 4 && (
+              
+              {/* 2nd Semester Subject Options */}
+              {isSecondSemester && (
+                <div className="p-3 mt-2 border rounded-md bg-gray-50/50 space-y-4">
+                  <h4 className="font-medium text-sm text-gray-700">Optional Subjects (Select up to 2)</h4>
+                  <FormField
+                    control={form.control}
+                    name="optionalSubject2nd_1"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Subject 1</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select Subject 1" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {secondSemSubjects.map(sub => (
+                              <SelectItem key={sub.id} value={sub.id.toString()}>{sub.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="optionalSubject2nd_2"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Subject 2</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select Subject 2" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {secondSemSubjects.map(sub => (
+                              <SelectItem key={sub.id} value={sub.id.toString()}>{sub.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              {/* 4th Semester Subject Options */}
+              {isFourthSemester && (
                 <FormField
                   control={form.control}
-                  name="optionalSubjectId"
+                  name="optionalSubject4th"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Optional Subject (4th Semester)</FormLabel>
+                      <FormLabel>Optional Subject</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
@@ -286,17 +328,14 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="none">None</SelectItem>
-                          {subjects.map(subject => (
+                          {fourthSemSubjects.map(subject => (
                             <SelectItem key={subject.id} value={subject.id.toString()}>
                               {subject.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <FormDescription>
-                        Assign an optional subject for this 4th-semester student.
-                      </FormDescription>
-                      <FormMessage />
+                      <FormDescription>Assign an optional subject for this student.</FormDescription>
                     </FormItem>
                   )}
                 />
