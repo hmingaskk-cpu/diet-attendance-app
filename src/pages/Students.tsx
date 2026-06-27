@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom"; // Imported to read the link parameter
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,12 +20,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import LoadingSkeleton from "@/components/LoadingSkeleton"; 
 
 const Students = () => {
-  // Read URL to see if a specific class was requested from the dashboard
   const [searchParams] = useSearchParams();
   const initialClass = searchParams.get("class") || "all";
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClass, setSelectedClass] = useState(initialClass); // Set initial dropdown value based on URL
+  const [selectedClass, setSelectedClass] = useState(initialClass); 
   const [students, setStudents] = useState<Student[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +38,6 @@ const Students = () => {
     try {
       setIsLoading(true);
       
-      // Get semesters
       const { data: semestersData, error: semestersError } = await supabase
         .from('semesters')
         .select('*')
@@ -48,7 +46,6 @@ const Students = () => {
       if (semestersError) throw semestersError;
       setSemesters(semestersData || []);
       
-      // Get students
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
         .select(`
@@ -75,7 +72,6 @@ const Students = () => {
     fetchStudentsAndSemesters();
   }, [toast]);
 
-  // Make sure the dropdown updates correctly if you click back to Dashboard and select a different class
   useEffect(() => {
     const classFromUrl = searchParams.get("class");
     if (classFromUrl) {
@@ -130,7 +126,6 @@ const Students = () => {
       
       if (error) throw error;
       
-      // Refresh student list
       fetchStudentsAndSemesters();
       
       toast({
