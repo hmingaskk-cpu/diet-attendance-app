@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { createStudent, Semester } from "@/lib/db";
+import { createStudent, Semester, Subject } from "@/lib/db";
 import { supabase } from "@/lib/supabaseClient";
 
 import { useForm } from "react-hook-form";
@@ -20,6 +20,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 
 const addStudentFormSchema = z.object({
@@ -35,10 +36,13 @@ const addStudentFormSchema = z.object({
   }),
   email: z.string().email({
     message: "Please enter a valid email address.",
-  }).optional().or(z.literal("")), // Allow empty string for optional email
+  }).optional().or(z.literal("")), 
   semesterId: z.string().min(1, {
     message: "Please select a semester.",
   }),
+  optionalSubject4th: z.string().optional().default("none"),
+  optionalSubject2nd_1: z.string().optional().default("none"),
+  optionalSubject2nd_2: z.string().optional().default("none"),
 });
 
 type AddStudentFormValues = z.infer<typeof addStudentFormSchema>;
@@ -51,6 +55,7 @@ interface AddStudentDialogProps {
 
 const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogProps) => {
   const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -61,43 +66,73 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
       rollNumber: "",
       email: "",
       semesterId: "",
+      optionalSubject4th: "none",
+      optionalSubject2nd_1: "none",
+      optionalSubject2nd_2: "none",
     },
   });
 
+  const selectedSemester = form.watch("semesterId");
+  const isSecondSemester = selectedSemester === "2";
+  const isFourthSemester = selectedSemester === "4";
+
+  const secondSemSubjects = subjects.filter(s => 
+    ['english', 'mizo', 'mathematics', 'evs', 'science', 'ss', 'other subjects'].includes(s.name.toLowerCase())
+  );
+  
+  const fourthSemSubjects = subjects.filter(s => 
+    ['maths', 'science', 'english', 'social studies', 'other subjects'].includes(s.name.toLowerCase())
+  );
+
   useEffect(() => {
-    const fetchSemesters = async () => {
-      const { data, error } = await supabase
-        .from('semesters')
-        .select('*')
-        .order('id');
+    const fetchData = async () => {
+      const { data: semData, error: semError } = await supabase.from('semesters').select('*').order('id');
+      if (!semError) setSemesters(semData || []);
       
-      if (error) {
-        toast({
-          title: "Error fetching semesters",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
-        setSemesters(data || []);
-      }
+      const { data: subData, error: subError } = await supabase.from('subjects').select('*').order('name');
+      if (!subError) setSubjects(subData || []);
     };
     
     if (isOpen) {
-      fetchSemesters();
-      form.reset(); // Reset form fields when dialog opens
+      fetchData();
+      form.reset(); 
     }
-  }, [isOpen, toast, form]);
+  }, [isOpen, form]);
 
   const onSubmit = async (values: AddStudentFormValues) => {
     setIsLoading(true);
 
     try {
-      await createStudent({
+      // 1. Create the student
+      const newStudent = await createStudent({
         name: values.name,
         roll_number: values.rollNumber,
-        email: values.email || null, // Ensure null for empty optional email
+        email: values.email || null, 
         semester_id: parseInt(values.semesterId)
       });
+
+      // 2. Assign Optional Subjects (if any)
+      const subjectInserts: { student_id: number, semester_id: number, subject_id: number }[] = [];
+
+      if (isSecondSemester) {
+        const uniqueSubjects = new Set<string>();
+        if (values.optionalSubject2nd_1 && values.optionalSubject2nd_1 !== "none") uniqueSubjects.add(values.optionalSubject2nd_1);
+        if (values.optionalSubject2nd_2 && values.optionalSubject2nd_2 !== "none") uniqueSubjects.add(values.optionalSubject2nd_2);
+        
+        uniqueSubjects.forEach(subId => {
+          subjectInserts.push({ student_id: newStudent.id, semester_id: 2, subject_id: parseInt(subId) });
+        });
+      } else if (isFourthSemester) {
+        if (values.optionalSubject4th && values.optionalSubject4th !== "none") {
+          subjectInserts.push({ student_id: newStudent.id, semester_id: 4, subject_id: parseInt(values.optionalSubject4th) });
+        }
+      }
+
+      // 3. Save subjects to database
+      if (subjectInserts.length > 0) {
+        const { error: subjectError } = await supabase.from('student_subjects').insert(subjectInserts);
+        if (subjectError) throw subjectError;
+      }
 
       toast({
         title: "Student Added",
@@ -118,7 +153,7 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Student</DialogTitle>
           <DialogDescription>
@@ -135,10 +170,7 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
                   <FormItem>
                     <FormLabel>Student Name</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="John Doe"
-                        {...field}
-                      />
+                      <Input placeholder="John Doe" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -151,10 +183,7 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
                   <FormItem>
                     <FormLabel>Roll Number</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="DIET/2023/001"
-                        {...field}
-                      />
+                      <Input placeholder="DIET/2023/001" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -167,11 +196,7 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
                   <FormItem>
                     <FormLabel>Email (Optional)</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="john.doe@example.com"
-                        {...field}
-                      />
+                      <Input type="email" placeholder="john.doe@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -201,8 +226,84 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
                   </FormItem>
                 )}
               />
+
+              {/* 2nd Semester Subject Options */}
+              {isSecondSemester && (
+                <div className="p-3 mt-2 border rounded-md bg-gray-50/50 space-y-4">
+                  <h4 className="font-medium text-sm text-gray-700">Optional Subjects (Select up to 2)</h4>
+                  <FormField
+                    control={form.control}
+                    name="optionalSubject2nd_1"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Subject 1</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select Subject 1" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {secondSemSubjects.map(sub => (
+                              <SelectItem key={sub.id} value={sub.id.toString()}>{sub.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="optionalSubject2nd_2"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Subject 2</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select Subject 2" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {secondSemSubjects.map(sub => (
+                              <SelectItem key={sub.id} value={sub.id.toString()}>{sub.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              {/* 4th Semester Subject Options */}
+              {isFourthSemester && (
+                <FormField
+                  control={form.control}
+                  name="optionalSubject4th"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Optional Subject</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select optional subject" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {fourthSemSubjects.map(sub => (
+                            <SelectItem key={sub.id} value={sub.id.toString()}>
+                              {sub.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Assign an optional subject for this student.</FormDescription>
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save Student"}
               </Button>
