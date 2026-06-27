@@ -179,7 +179,7 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Passed Out Students Card (Only shows if there are any) */}
+            {/* Passed Out Students Card */}
             {passedOutSemesters.length > 0 && (
               <Card className="shadow-sm rounded-lg">
                 <CardHeader>
@@ -189,7 +189,8 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {passedOutSemesters.map((semester) => (
-                      <Link to={`/students`} key={semester.id}>
+                      {/* Notice the ?class= ID added here to pass the class over */}
+                      <Link to={`/students?class=${semester.id}`} key={semester.id}>
                         <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors mt-4 first:mt-0">
                           <div>
                             <h3 className="font-medium">{semester.name}</h3>
