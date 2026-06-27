@@ -39,7 +39,6 @@ const Dashboard = () => {
           setFacultyName(userDetails?.name || "Faculty");
           setRole(userDetails?.role || "Faculty");
           
-          
           const { data: semestersData, error: semestersError } = await supabase
             .from('semesters')
             .select('*')
@@ -47,7 +46,6 @@ const Dashboard = () => {
           
           if (semestersError) throw semestersError;
           setSemesters(semestersData || []);
-          
           
           const counts: Record<number, number> = {};
           for (const semester of semestersData || []) {
@@ -61,7 +59,6 @@ const Dashboard = () => {
           }
           setStudentCounts(counts);
           
-          
           const today = new Date().toISOString().split('T')[0];
           const { data: distinctPeriodsData, error: distinctPeriodsError } = await supabase
             .from('attendance_records')
@@ -70,7 +67,6 @@ const Dashboard = () => {
           
           if (distinctPeriodsError) throw distinctPeriodsError;
           setTodayAttendanceCount(distinctPeriodsData?.length || 0);
-          
           
           const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
             .toISOString().split('T')[0];
@@ -97,10 +93,8 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [toast]);
 
-  
   const totalStudents = Object.values(studentCounts).reduce((sum, count) => sum + count, 0);
 
-  // Split semesters into Active (1st, 2nd, 3rd, 4th) and Passed Out
   const activeSemesterKeywords = ["1st semester", "2nd semester", "3rd semester", "4th semester"];
   
   const activeSemesters = semesters.filter(sem => 
@@ -146,9 +140,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          
           <div className="space-y-6">
-            
             <Card className="shadow-sm rounded-lg">
               <CardHeader>
                 <CardTitle>Classes</CardTitle>
@@ -231,7 +223,6 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           </div>
-          
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
