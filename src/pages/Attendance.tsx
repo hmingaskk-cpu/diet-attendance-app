@@ -13,12 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Save, Copy, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { Student, AttendanceRecord, getSubjects, Subject, getStudentsBySemester, getStudentsWithoutOptionalSubject } from "@/lib/db";
+import { Student, getSubjects, Subject, getStudentsBySemester, getStudentsWithoutOptionalSubject } from "@/lib/db";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const Attendance = () => {
-  const { id } = useParams(); // id is semesterId
+  const { id } = useParams(); 
   const navigate = useNavigate();
   const { toast } = useToast();
   const [facultyName, setFacultyName] = useState("");
@@ -36,15 +36,15 @@ const Attendance = () => {
   const [previousPeriodAttendance, setPreviousPeriodAttendance] = useState<Record<string, boolean>>({});
   const [cachedAttendance, setCachedAttendance] = useState<any | null>(null);
 
-  // States for optional subjects
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("none"); // Initialize with "none"
-  const [otherSubjectsId, setOtherSubjectsId] = useState<string | null>(null); // To store the ID of 'Other Subjects'
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("none"); 
+  const [otherSubjectsId, setOtherSubjectsId] = useState<string | null>(null); 
 
   const isCurrentDate = date === today;
+  const isSecondSemester = parseInt(id || "0") === 2;
   const isFourthSemester = parseInt(id || "0") === 4;
+  const hasOptionalSubjects = isSecondSemester || isFourthSemester;
 
-  // Effect for fetching static data (semesters, subjects)
   useEffect(() => {
     const fetchStaticData = async () => {
       if (!id) return;
@@ -74,19 +74,30 @@ const Attendance = () => {
         if (semesterError) throw semesterError;
         setSemesterName(semesterData?.name || "");
 
-        if (isFourthSemester) {
+        if (hasOptionalSubjects) {
           const subjectsData = await getSubjects();
           
           if (subjectsData && subjectsData.length > 0) {
-            setSubjects(subjectsData);
-            const otherSub = subjectsData.find(s => s.name === 'Other Subjects');
+            let filteredSubjects = subjectsData;
+            
+            // Filter subjects depending on which class we are viewing
+            if (isSecondSemester) {
+                const secondSemAllowed = ['english', 'mizo', 'mathematics', 'evs', 'science', 'ss', 'other subjects'];
+                filteredSubjects = subjectsData.filter(s => secondSemAllowed.includes(s.name.toLowerCase()));
+            } else if (isFourthSemester) {
+                const fourthSemAllowed = ['maths', 'science', 'english', 'social studies', 'other subjects'];
+                filteredSubjects = subjectsData.filter(s => fourthSemAllowed.includes(s.name.toLowerCase()));
+            }
+
+            setSubjects(filteredSubjects);
+            
+            const otherSub = filteredSubjects.find(s => s.name === 'Other Subjects');
             if (otherSub) {
               setOtherSubjectsId(otherSub.id.toString());
             }
 
-            // Set default selectedSubjectId to "none" on initial load for 4th semester
             setSelectedSubjectId(prevSelectedSubjectId => {
-              if (prevSelectedSubjectId === "none" || !subjectsData.some(s => s.id.toString() === prevSelectedSubjectId)) {
+              if (prevSelectedSubjectId === "none" || !filteredSubjects.some(s => s.id.toString() === prevSelectedSubjectId)) {
                 return "none";
               }
               return prevSelectedSubjectId;
@@ -97,7 +108,7 @@ const Attendance = () => {
             setSelectedSubjectId("none");
             toast({
               title: "No Optional Subjects Found",
-              description: "Please ensure optional subjects (Maths, Science, English, Social Studies) are added to the 'subjects' table in Supabase.",
+              description: "Please ensure optional subjects are added to the 'subjects' table in Supabase.",
               variant: "destructive",
               duration: 7000,
             });
@@ -117,9 +128,8 @@ const Attendance = () => {
     };
 
     fetchStaticData();
-  }, [id, navigate, toast, isFourthSemester]);
+  }, [id, navigate, toast, hasOptionalSubjects, isSecondSemester, isFourthSemester]);
 
-  // Effect for fetching dynamic data (students, attendance, period statuses)
   useEffect(() => {
     const fetchDynamicData = async () => {
       if (!id || !facultyId) {
@@ -130,22 +140,18 @@ const Attendance = () => {
       setIsLoading(true);
       try {
         let studentsData: Student[] = [];
-        if (isFourthSemester) {
+        if (hasOptionalSubjects) {
           if (selectedSubjectId === "none") {
-            // "None" selected, fetch students without any optional subject assigned
             studentsData = await getStudentsWithoutOptionalSubject(parseInt(id));
           } else if (selectedSubjectId === otherSubjectsId) {
-            // "Other Subjects" selected, fetch all students for the 4th semester
             studentsData = await getStudentsBySemester(parseInt(id));
           } else {
-            // Specific optional subject selected, fetch students assigned to that subject
             studentsData = await getStudentsBySemester(
               parseInt(id),
               parseInt(selectedSubjectId)
             );
           }
         } else {
-          // Not 4th semester, fetch all students for the semester
           studentsData = await getStudentsBySemester(parseInt(id));
         }
         setStudents(studentsData || []);
@@ -173,7 +179,6 @@ const Attendance = () => {
         });
         setGlobalPeriodStatuses(newGlobalPeriodStatuses);
 
-        // Check for cached data first
         const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}_${selectedSubjectId || 'no_subject'}`;
         const storedCachedData = localStorage.getItem(cachedKey);
 
@@ -189,15 +194,7 @@ const Attendance = () => {
 
           const allPresentInCache = studentsData.every(student => cachedRecordsMap[student.id.toString()] === true);
           setSelectAll(allPresentInCache);
-
-          toast({
-            title: "Offline Data Found",
-            description: "Attendance data for this period was previously saved offline. Please review and submit.",
-            variant: "default",
-            duration: 7000,
-          });
         } else {
-          // If no cached data, then fetch existing attendance from DB
           let attendanceQuery = supabase
             .from('attendance_records')
             .select(`
@@ -225,7 +222,7 @@ const Attendance = () => {
           });
 
           setAttendance(initialAttendance);
-          setCachedAttendance(null); // Ensure cachedAttendance is null if no cache
+          setCachedAttendance(null); 
         }
 
         if (parseInt(period) > 1) {
@@ -263,7 +260,7 @@ const Attendance = () => {
     };
 
     fetchDynamicData();
-  }, [id, date, period, facultyId, currentUserRole, isFourthSemester, selectedSubjectId, otherSubjectsId, toast]);
+  }, [id, date, period, facultyId, currentUserRole, hasOptionalSubjects, selectedSubjectId, otherSubjectsId, toast]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -314,7 +311,6 @@ const Attendance = () => {
 
     const currentPeriodNum = parseInt(period);
     const periodStatus = globalPeriodStatuses[currentPeriodNum];
-    const isCurrentDate = date === today;
 
     if (periodStatus?.status === 'taken-by-other' && currentUserRole !== 'admin') {
       toast({
@@ -364,7 +360,6 @@ const Attendance = () => {
 
       if (insertError) throw insertError;
 
-      // If successful, clear cached data
       const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}_${selectedSubjectId || 'no_subject'}`;
       localStorage.removeItem(cachedKey);
       setCachedAttendance(null);
@@ -401,15 +396,13 @@ const Attendance = () => {
             semesterName,
             facultyName,
             studentsAttendance: studentsForExport,
-            optionalSubject: isFourthSemester && selectedSubjectId !== "none" ? subjects.find(s => s.id.toString() === selectedSubjectId)?.name : undefined,
+            optionalSubject: hasOptionalSubjects && selectedSubjectId !== "none" ? subjects.find(s => s.id.toString() === selectedSubjectId)?.name : undefined,
           };
 
           const { data: { session } } = await supabase.auth.getSession();
           const accessToken = session?.access_token;
 
-          if (!accessToken) {
-            throw new Error("User not authenticated for Edge Function export.");
-          }
+          if (!accessToken) throw new Error("User not authenticated for Edge Function export.");
 
           const edgeFunctionUrl = `https://ligxffklcdiosnitdqim.supabase.co/functions/v1/export-attendance-to-sheets`;
 
@@ -427,15 +420,12 @@ const Attendance = () => {
             throw new Error(`Edge Function returned a non-2xx status: ${response.status} - ${errorText}`);
           }
 
-          const result = await response.json();
-          console.log("Google Sheets Export successful:", result);
           toast({
             title: "Google Sheets Exported",
             description: "Attendance data has been exported to Google Sheets.",
           });
 
         } catch (exportInvokeError: any) {
-          console.error("Unexpected error during Edge Function invocation:", exportInvokeError);
           toast({
             title: "Google Sheets Export Failed",
             description: `An unexpected error occurred during Google Sheets export: ${exportInvokeError.message}`,
@@ -445,9 +435,6 @@ const Attendance = () => {
       }
 
     } catch (error: any) {
-      console.error("Error saving attendance:", error);
-
-      // Construct cached data object
       const cachedData = {
         date,
         period: currentPeriodNum,
@@ -476,14 +463,7 @@ const Attendance = () => {
   };
 
   const handleDeleteAttendance = async () => {
-    if (!facultyId) {
-      toast({
-        title: "Authentication Error",
-        description: "Faculty ID not found. Please log in again.",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!facultyId) return;
 
     setIsLoading(true);
     try {
@@ -499,10 +479,8 @@ const Attendance = () => {
       }
 
       const { error } = await deleteQuery;
-
       if (error) throw error;
 
-      // Clear cached data if it exists for this period
       const cachedKey = `cachedAttendance_${facultyId}_${id}_${date}_${period}_${selectedSubjectId || 'no_subject'}`;
       localStorage.removeItem(cachedKey);
       setCachedAttendance(null);
@@ -531,15 +509,11 @@ const Attendance = () => {
     }
   };
 
-  // Determine if the student list is empty due to filtering (e.g., no students for selected subject)
   const isStudentListEmpty = students.length === 0;
-
-  // Determine if submission/deletion should be disabled
   const isPeriodTakenByOtherFaculty = globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole !== 'admin';
   const isSubmitDisabled = isPeriodTakenByOtherFaculty || isStudentListEmpty;
   const currentPeriodStatus = globalPeriodStatuses[parseInt(period)];
   const isDeleteDisabled = !currentPeriodStatus || isPeriodTakenByOtherFaculty || isStudentListEmpty;
-
 
   if (isLoading) {
     return (
@@ -580,7 +554,6 @@ const Attendance = () => {
                     id="faculty"
                     placeholder="Enter your name"
                     value={facultyName}
-                    onChange={(e) => setFacultyName(e.target.value)}
                     className="rounded-l-none"
                     readOnly
                   />
@@ -607,11 +580,7 @@ const Attendance = () => {
                       }
 
                       return (
-                        <SelectItem
-                          key={p}
-                          value={p.toString()}
-                          className={itemClassName}
-                        >
+                        <SelectItem key={p} value={p.toString()} className={itemClassName}>
                           Period {p} {statusText}
                         </SelectItem>
                       );
@@ -633,9 +602,11 @@ const Attendance = () => {
                 </div>
               </div>
             </div>
-            {isFourthSemester && (
+            
+            {/* The dropdown logic is now applied to ANY class that has Optional Subjects */}
+            {hasOptionalSubjects && (
               <div className="space-y-2">
-                <Label htmlFor="subject">Select Subject</Label> {/* Renamed title */}
+                <Label htmlFor="subject">Select Subject</Label> 
                 <Select
                   value={selectedSubjectId}
                   onValueChange={setSelectedSubjectId}
@@ -658,11 +629,12 @@ const Attendance = () => {
                 )}
                 {selectedSubjectId === "none" && subjects.length > 0 && (
                   <p className="text-sm text-gray-500">
-                    Selecting "None" will display all 4th-semester students who do not have an optional subject assigned.
+                    Selecting "None" will display all students in this semester who do not have an optional subject assigned.
                   </p>
                 )}
               </div>
             )}
+            
             {isPeriodTakenByOtherFaculty && (
               <p className="text-destructive text-sm mt-2">
                 Attendance for Period {period} on {date} has already been submitted by another faculty member. You cannot modify it.
@@ -716,11 +688,11 @@ const Attendance = () => {
           <CardContent>
             {isStudentListEmpty ? (
               <div className="text-center p-8 text-gray-500">
-                {isFourthSemester && selectedSubjectId === "none"
-                  ? "No 4th-semester students found without an optional subject assigned."
-                  : isFourthSemester && selectedSubjectId === otherSubjectsId
-                    ? "No 4th-semester students found."
-                    : isFourthSemester && selectedSubjectId !== "none"
+                {hasOptionalSubjects && selectedSubjectId === "none"
+                  ? "No students found without an optional subject assigned."
+                  : hasOptionalSubjects && selectedSubjectId === otherSubjectsId
+                    ? "No students found."
+                    : hasOptionalSubjects && selectedSubjectId !== "none"
                       ? `No students found for the selected subject.`
                       : "No students found for this semester."}
               </div>
@@ -788,16 +760,14 @@ const Attendance = () => {
                   Are you sure you want to delete attendance for Period {period} on {date}? This action cannot be undone.
                   {currentPeriodStatus?.status === 'taken-by-other' && currentUserRole === 'admin' && (
                     <p className="text-orange-600 mt-2">
-                      As an admin, this will permanently delete the attendance record for this period, even if taken by another faculty.
+                      As an admin, this will permanently delete the attendance record for this period.
                     </p>
                   )}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteAttendance}>
-                  Confirm Delete
-                </AlertDialogAction>
+                <AlertDialogAction onClick={handleDeleteAttendance}>Confirm Delete</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -819,11 +789,6 @@ const Attendance = () => {
                   {globalPeriodStatuses[parseInt(period)]?.status === 'taken-by-other' && currentUserRole === 'admin' && (
                     <p className="text-orange-600 mt-2">
                       As an admin, this action will overwrite existing attendance data for this period.
-                    </p>
-                  )}
-                  {!isCurrentDate && (
-                    <p className="text-gray-500 mt-2">
-                      Note: Updating past attendance will not export data to Google Sheets.
                     </p>
                   )}
                 </AlertDialogDescription>
