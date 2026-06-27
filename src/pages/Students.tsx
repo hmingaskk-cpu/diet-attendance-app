@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom"; // Imported to read the link parameter
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,20 +15,24 @@ import { useToast } from "@/hooks/use-toast";
 import { Student, Semester } from "@/lib/db";
 import AddStudentDialog from "@/components/students/AddStudentDialog";
 import ImportStudentsDialog from "@/components/students/ImportStudentsDialog";
-import EditStudentDialog from "@/components/students/EditStudentDialog"; // Import new component
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog
-import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
+import EditStudentDialog from "@/components/students/EditStudentDialog"; 
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; 
+import LoadingSkeleton from "@/components/LoadingSkeleton"; 
 
 const Students = () => {
+  // Read URL to see if a specific class was requested from the dashboard
+  const [searchParams] = useSearchParams();
+  const initialClass = searchParams.get("class") || "all";
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClass, setSelectedClass] = useState("all");
+  const [selectedClass, setSelectedClass] = useState(initialClass); // Set initial dropdown value based on URL
   const [students, setStudents] = useState<Student[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isImportStudentsDialogOpen, setIsImportStudentsDialogOpen] = useState(false);
-  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false); // State for edit dialog
-  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<Student | null>(null); // State for selected student
+  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false); 
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<Student | null>(null); 
   const { toast } = useToast();
 
   const fetchStudentsAndSemesters = async () => {
@@ -70,6 +75,14 @@ const Students = () => {
     fetchStudentsAndSemesters();
   }, [toast]);
 
+  // Make sure the dropdown updates correctly if you click back to Dashboard and select a different class
+  useEffect(() => {
+    const classFromUrl = searchParams.get("class");
+    if (classFromUrl) {
+      setSelectedClass(classFromUrl);
+    }
+  }, [searchParams]);
+
   const handleExport = () => {
     if (students.length === 0) {
       toast({
@@ -86,7 +99,7 @@ const Students = () => {
       student.name,
       student.email || "",
       (student as any).semester?.name || `Semester ${student.semester_id}`
-    ].map(field => `"${field}"`).join(',')); // Wrap fields in quotes to handle commas
+    ].map(field => `"${field}"`).join(',')); 
 
     const csvString = [headers.join(','), ...csvRows].join('\n');
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
@@ -143,7 +156,7 @@ const Students = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
+        <div className="p-4 md:p-6 pb-20 md:pb-6"> 
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
@@ -154,7 +167,7 @@ const Students = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
+      <div className="p-4 md:p-6 pb-20 md:pb-6"> 
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Student Management</h1>
           <p className="text-gray-600">Manage student records and import/export data</p>
@@ -169,7 +182,7 @@ const Students = () => {
                   View and manage student information
                 </CardDescription>
               </div>
-              <div className="flex flex-wrap gap-2"> {/* Use flex-wrap for buttons on small screens */}
+              <div className="flex flex-wrap gap-2"> 
                 <Button onClick={() => setIsImportStudentsDialogOpen(true)} variant="outline">
                   <Upload className="mr-2 h-4 w-4" />
                   Import
@@ -215,7 +228,7 @@ const Students = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto"> {/* Make table horizontally scrollable */}
+            <div className="overflow-x-auto"> 
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -227,46 +240,54 @@ const Students = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredStudents.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell>
-                        <Badge variant="outline">{student.roll_number}</Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
-                      <TableCell>{student.email || "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the student 
-                                  record and any associated attendance data.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteStudent(student.id)}>Continue</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
+                  {filteredStudents.length > 0 ? (
+                    filteredStudents.map((student) => (
+                      <TableRow key={student.id}>
+                        <TableCell>
+                          <Badge variant="outline">{student.roll_number}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{student.name}</TableCell>
+                        <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
+                        <TableCell>{student.email || "-"}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the student 
+                                    record and any associated attendance data.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteStudent(student.id)}>Continue</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                        No students found.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>
