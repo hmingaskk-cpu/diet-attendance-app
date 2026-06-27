@@ -147,10 +147,8 @@ const Dashboard = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           
-          {/* LEFT COLUMN: Classes & Passed Out Students */}
           <div className="space-y-6">
             
-            {/* Active Classes Card */}
             <Card className="shadow-sm rounded-lg">
               <CardHeader>
                 <CardTitle>Classes</CardTitle>
@@ -179,7 +177,6 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Passed Out Students Card */}
             {passedOutSemesters.length > 0 && (
               <Card className="shadow-sm rounded-lg">
                 <CardHeader>
@@ -189,7 +186,6 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {passedOutSemesters.map((semester) => (
-                      {/* Notice the ?class= ID added here to pass the class over */}
                       <Link to={`/students?class=${semester.id}`} key={semester.id}>
                         <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors mt-4 first:mt-0">
                           <div>
@@ -208,7 +204,6 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* RIGHT COLUMN: Quick Actions Card */}
           <div>
             <Card className="shadow-sm rounded-lg">
               <CardHeader>
@@ -239,7 +234,6 @@ const Dashboard = () => {
           
         </div>
 
-        {/* Summary/Report Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="shadow-sm rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
