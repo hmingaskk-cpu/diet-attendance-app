@@ -8,16 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Download, Filter, ListFilter } from "lucide-react"; // Import ListFilter icon
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { Calendar, Download, Filter, ListFilter } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { Semester, Student, getStudentDetailedAttendance } from "@/lib/db"; // Import getStudentDetailedAttendance
-import Papa from "papaparse"; // Import PapaParse for CSV export
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
-import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport"; // Import new component
-import DeleteAllAttendanceDialog from "@/components/reports/DeleteAllAttendanceDialog"; // Import new component
-import LoadingSkeleton from "@/components/LoadingSkeleton"; // Import LoadingSkeleton
+import { Semester, Student, getStudentDetailedAttendance } from "@/lib/db";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport";
+import DeleteAllAttendanceDialog from "@/components/reports/DeleteAllAttendanceDialog";
+import LoadingSkeleton from "@/components/LoadingSkeleton";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -33,16 +31,30 @@ const reportColumnOptions = [
   { value: "attendance_percentage", label: "Attendance Percentage" },
 ];
 
+// HELPER FUNCTION: Convert yyyy-mm-dd to dd/mm/yyyy
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+};
+
 const Reports = () => {
+  // Input states (What the user is currently typing/selecting)
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
-  const [selectedClass, setSelectedClass] = useState("all");
-  const [selectedStudent, setSelectedStudent] = useState(""); // This will now filter the dropdown in ComprehensiveStudentReport
-  const [attendanceData, setAttendanceData] = useState<any[]>([]); // Keep for potential future use or if chart is re-added
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState("");
+
+  // Active filters (What is actually generating the table)
+  const [activeFilters, setActiveFilters] = useState({ from: "", to: "", class: "" });
+
   const [studentReports, setStudentReports] = useState<any[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUserRole, setCurrentUserRole] = useState(""); // State to store current user's role
+  const [currentUserRole, setCurrentUserRole] = useState("");
   const [selectedReportColumns, setSelectedReportColumns] = useState<string[]>(
     reportColumnOptions.map(option => option.value)
   );
@@ -52,7 +64,6 @@ const Reports = () => {
     try {
       setIsLoading(true);
       
-      // Get current user role
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: userDetails } = await supabase
@@ -65,7 +76,6 @@ const Reports = () => {
         }
       }
 
-      // Get semesters
       const { data: semestersData, error: semestersError } = await supabase
         .from('semesters')
         .select('*')
@@ -74,7 +84,6 @@ const Reports = () => {
       if (semestersError) throw semestersError;
       setSemesters(semestersData || []);
       
-      // Get students
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
         .select('*')
@@ -83,15 +92,6 @@ const Reports = () => {
       if (studentsError) throw studentsError;
       setStudents(studentsData || []);
       
-      // Set default date range to last 30 days
-      const today = new Date();
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-      
-      setDateRange({
-        from: thirtyDaysAgo.toISOString().split('T')[0],
-        to: today.toISOString().split('T')[0]
-      });
     } catch (error: any) {
       toast({
         title: "Error loading data",
@@ -107,142 +107,110 @@ const Reports = () => {
     fetchInitialData();
   }, [toast]);
 
-  useEffect(() => {
-    const fetchReportData = async () => {
-      if (!dateRange.from || !dateRange.to) return;
-      
-      try {
-        // Fetch attendance data for chart (still fetching, but not displayed)
-        let query = supabase
+  // Function to actually fetch data based on LOCKED IN filters
+  const fetchReportData = async (fromDate: string, toDate: string, classId: string) => {
+    setIsLoading(true);
+    try {
+      const studentReportsMap: Record<number, { 
+        id: number; 
+        name: string; 
+        roll: string; 
+        class: string; 
+        total: number; 
+        present: number 
+      }> = {};
+
+      if (classId !== "all") {
+        const studentsInSelectedSemester = students.filter(s => s.semester_id.toString() === classId);
+        
+        for (const student of studentsInSelectedSemester) {
+          const detailedAttendance = await getStudentDetailedAttendance(
+            student.id,
+            parseInt(classId),
+            fromDate,
+            toDate
+          );
+
+          const totalPeriods = detailedAttendance.length;
+          const periodsPresent = detailedAttendance.filter(record => record.is_present).length;
+          
+          studentReportsMap[student.id] = {
+            id: student.id,
+            name: student.name,
+            roll: student.roll_number,
+            class: semesters.find(s => s.id.toString() === classId)?.name || "Unknown",
+            total: totalPeriods,
+            present: periodsPresent
+          };
+        }
+      } else {
+        const { data: allAttendanceRecords, error: allAttendanceError } = await supabase
           .from('attendance_records')
           .select(`
-            date,
-            is_present
+            student_id,
+            is_present,
+            student:students (name, roll_number),
+            semester:semesters (name)
           `)
-          .gte('date', dateRange.from)
-          .lte('date', dateRange.to);
-        
-        if (selectedClass !== "all") {
-          query = query.eq('semester_id', selectedClass);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        
-        // Process data for chart
-        const chartData: Record<string, { date: string; present: number; absent: number }> = {};
-        
-        data?.forEach(record => {
-          const date = record.date;
-          if (!chartData[date]) {
-            chartData[date] = { date, present: 0, absent: 0 };
-          }
-          
-          if (record.is_present) {
-            chartData[date].present += 1;
-          } else {
-            chartData[date].absent += 1;
-          }
-        });
-        
-        setAttendanceData(Object.values(chartData));
-        
-        // Fetch student attendance percentages for DAR table
-        const studentReportsMap: Record<number, { 
-          id: number; 
-          name: string; 
-          roll: string; 
-          class: string; 
-          total: number; 
-          present: number 
-        }> = {};
+          .gte('date', fromDate)
+          .lte('date', toDate);
 
-        if (selectedClass !== "all") {
-          // If a specific semester is selected, fetch students for that semester
-          const studentsInSelectedSemester = students.filter(s => s.semester_id.toString() === selectedClass);
-          
-          for (const student of studentsInSelectedSemester) {
-            const detailedAttendance = await getStudentDetailedAttendance(
-              student.id,
-              parseInt(selectedClass),
-              dateRange.from,
-              dateRange.to
-            );
+        if (allAttendanceError) throw allAttendanceError;
 
-            const totalPeriods = detailedAttendance.length;
-            const periodsPresent = detailedAttendance.filter(record => record.is_present).length;
-            
-            studentReportsMap[student.id] = {
-              id: student.id,
-              name: student.name,
-              roll: student.roll_number,
-              class: semesters.find(s => s.id.toString() === selectedClass)?.name || "Unknown",
-              total: totalPeriods,
-              present: periodsPresent
+        allAttendanceRecords?.forEach(record => {
+          const studentId = record.student_id;
+          if (!studentReportsMap[studentId]) {
+            studentReportsMap[studentId] = {
+              id: studentId,
+              name: (record.student as any)?.name || "Unknown",
+              roll: (record.student as any)?.roll_number || "Unknown",
+              class: "All Semesters",
+              total: 0,
+              present: 0
             };
           }
-        } else {
-          // If "All Classes" is selected, aggregate attendance for each student across all their semesters.
-          const { data: allAttendanceRecords, error: allAttendanceError } = await supabase
-            .from('attendance_records')
-            .select(`
-              student_id,
-              is_present,
-              student:students (name, roll_number),
-              semester:semesters (name)
-            `)
-            .gte('date', dateRange.from)
-            .lte('date', dateRange.to);
-
-          if (allAttendanceError) throw allAttendanceError;
-
-          allAttendanceRecords?.forEach(record => {
-            const studentId = record.student_id;
-            if (!studentReportsMap[studentId]) {
-              studentReportsMap[studentId] = {
-                id: studentId,
-                name: record.student?.name || "Unknown",
-                roll: record.student?.roll_number || "Unknown",
-                class: "All Semesters", // Indicate aggregation across semesters
-                total: 0,
-                present: 0
-              };
-            }
-            
-            studentReportsMap[studentId].total += 1;
-            if (record.is_present) {
-              studentReportsMap[studentId].present += 1;
-            }
-          });
-        }
-
-        // Calculate percentages and convert map to array
-        const studentReports = Object.values(studentReportsMap).map(student => ({
-          ...student,
-          attendance: student.total > 0 ? Math.round((student.present / student.total) * 100) : 0
-        }));
-        
-        setStudentReports(studentReports);
-      } catch (error: any) {
-        toast({
-          title: "Error loading report data",
-          description: error.message,
-          variant: "destructive"
+          
+          studentReportsMap[studentId].total += 1;
+          if (record.is_present) {
+            studentReportsMap[studentId].present += 1;
+          }
         });
       }
-    };
-    
-    if (!isLoading) {
-      fetchReportData();
-    }
-  }, [dateRange, selectedClass, isLoading, toast, students, semesters]); // Added students and semesters to dependencies
 
+      const generatedReports = Object.values(studentReportsMap).map(student => ({
+        ...student,
+        attendance: student.total > 0 ? Math.round((student.present / student.total) * 100) : 0
+      }));
+      
+      setStudentReports(generatedReports);
+    } catch (error: any) {
+      toast({
+        title: "Error loading report data",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   const handleGenerateReport = () => {
-    // This will trigger the useEffect above
+    if (!dateRange.from || !dateRange.to || !selectedClass) {
+      toast({
+        title: "Incomplete Filters",
+        description: "Please select a From Date, To Date, and Class before generating.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Lock in the filters and run the query!
+    setActiveFilters({ from: dateRange.from, to: dateRange.to, class: selectedClass });
+    fetchReportData(dateRange.from, dateRange.to, selectedClass);
+    
     toast({
-      title: "Report Generated",
-      description: "Attendance report has been updated."
+      title: "Generating Report...",
+      description: "Fetching attendance data based on your filters."
     });
   };
 
@@ -269,7 +237,7 @@ const Reports = () => {
     }
     if (selectedReportColumns.includes("attendance_percentage")) {
       headers.push("Attendance %");
-      dataKeys.push("attendance_percentage_string"); // Custom key for formatted percentage
+      dataKeys.push("attendance_percentage_string"); 
     }
 
     const csvRows = studentReports.map(student => {
@@ -281,28 +249,40 @@ const Reports = () => {
           row.push(student[key as keyof typeof student]);
         }
       });
-      return row.map(field => `"${field}"`).join(','); // Wrap fields in quotes to handle commas
+      return row.map(field => `"${field}"`).join(','); 
     });
 
     const csvString = [headers.join(','), ...csvRows].join('\n');
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'attendance_report.csv');
+    
+    // Use the safe formatted dates for the filename
+    const safeStartDate = formatDate(activeFilters.from).replace(/\//g, '-');
+    const safeEndDate = formatDate(activeFilters.to).replace(/\//g, '-');
+    link.setAttribute('download', `attendance_summary_${safeStartDate}_to_${safeEndDate}.csv`);
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     toast({
       title: "Report Downloaded",
-      description: "Attendance report has been downloaded as attendance_report.csv.",
+      description: "Attendance report has been downloaded.",
     });
   };
 
-  if (isLoading) {
+  // Called if admin wipes all attendance data
+  const handleResetData = () => {
+    setActiveFilters({ from: "", to: "", class: "" });
+    setStudentReports([]);
+    fetchInitialData();
+  };
+
+  if (isLoading && !activeFilters.class) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
+        <div className="p-4 md:p-6 pb-20 md:pb-6"> 
           <LoadingSkeleton count={1} height="h-10" width="w-1/2" className="mb-6" />
           <LoadingSkeleton count={1} height="h-40" className="mb-6" />
           <LoadingSkeleton count={5} height="h-12" />
@@ -313,7 +293,7 @@ const Reports = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="p-4 md:p-6 pb-20 md:pb-6"> {/* Added pb-20 for mobile bottom nav */}
+      <div className="p-4 md:p-6 pb-20 md:pb-6"> 
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Attendance Reports</h1>
           <p className="text-gray-600">Generate and view attendance reports</p>
@@ -371,49 +351,50 @@ const Reports = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="student">Student</Label>
+                <Label htmlFor="student">Student Filter (Optional)</Label>
                 <Input
                   id="student"
-                  placeholder="Search student by name or roll number..."
+                  placeholder="Filter by name or roll..."
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
                 />
               </div>
             </div>
             <div className="flex justify-end mt-4">
-              <Button onClick={handleGenerateReport}>
+              <Button onClick={handleGenerateReport} disabled={isLoading}>
                 <Filter className="mr-2 h-4 w-4" />
-                Generate Report
+                {isLoading ? "Loading..." : "Generate Report"}
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="daily-student-report" className="w-full">
+        <Tabs defaultValue="daily-student-report" className="w-full mt-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger 
               value="daily-student-report" 
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
             >
-              DAR
+              DAR (Summary)
             </TabsTrigger>
             <TabsTrigger 
               value="comprehensive-student-report" 
-              disabled={selectedClass === "all"}
+              disabled={activeFilters.class === "all" || !activeFilters.class}
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
             >
-              CSR
+              CSR (Detailed)
             </TabsTrigger>
           </TabsList>
+          
           <TabsContent value="daily-student-report">
-            <div className="grid grid-cols-1 gap-6 mb-6"> {/* Changed to grid-cols-1 */}
+            <div className="grid grid-cols-1 gap-6 mb-6"> 
               <Card className="shadow-sm rounded-lg">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Student Attendance</CardTitle>
+                    <CardTitle>Student Attendance Summary</CardTitle>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" disabled={!activeFilters.class}>
                           <ListFilter className="mr-2 h-4 w-4" /> Customize Columns
                         </Button>
                       </DropdownMenuTrigger>
@@ -438,79 +419,73 @@ const Reports = () => {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <CardDescription>Individual student attendance percentages</CardDescription>
+                  <CardDescription>
+                    {activeFilters.from && activeFilters.to 
+                      ? `Showing data from ${formatDate(activeFilters.from)} to ${formatDate(activeFilters.to)}` 
+                      : "Individual student attendance percentages"}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto"> {/* Make table horizontally scrollable */}
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Roll No.</TableHead>
-                          <TableHead>Student Name</TableHead>
-                          <TableHead>Class</TableHead>
-                          {selectedReportColumns.includes("total_periods_marked") && <TableHead>Total Periods Marked</TableHead>}
-                          {selectedReportColumns.includes("total_present") && <TableHead>Total Present</TableHead>}
-                          {selectedReportColumns.includes("attendance_percentage") && <TableHead className="text-right">Attendance %</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {studentReports.map((student) => (
-                          <TableRow key={student.id}>
-                            <TableCell>
-                              <Badge variant="outline">{student.roll}</Badge>
-                            </TableCell>
-                            <TableCell className="font-medium">{student.name}</TableCell>
-                            <TableCell>{student.class}</TableCell>
-                            {selectedReportColumns.includes("total_periods_marked") && <TableCell>{student.total}</TableCell>}
-                            {selectedReportColumns.includes("total_present") && <TableCell>{student.present}</TableCell>}
-                            {selectedReportColumns.includes("attendance_percentage") && (
-                              <TableCell className="text-right">
-                                <Badge 
-                                  variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
-                                >
-                                  {student.attendance}%
-                                </Badge>
-                              </TableCell>
-                            )}
+                  
+                  {/* HIDDEN LOGIC IMPLEMENTED HERE */}
+                  {(!activeFilters.from || !activeFilters.to || !activeFilters.class) ? (
+                    <div className="text-center p-8 text-gray-500 border rounded-lg bg-gray-50">
+                      Please select a Class and Date Range above, then click <strong>Generate Report</strong> to view students.
+                    </div>
+                  ) : studentReports.length === 0 ? (
+                    <div className="text-center p-8 text-gray-500 border rounded-lg bg-gray-50">
+                      No attendance data found for the selected dates and class.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto"> 
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Roll No.</TableHead>
+                            <TableHead>Student Name</TableHead>
+                            <TableHead>Class</TableHead>
+                            {selectedReportColumns.includes("total_periods_marked") && <TableHead>Total Periods Marked</TableHead>}
+                            {selectedReportColumns.includes("total_present") && <TableHead>Total Present</TableHead>}
+                            {selectedReportColumns.includes("attendance_percentage") && <TableHead className="text-right">Attendance %</TableHead>}
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        </TableHeader>
+                        <TableBody>
+                          {studentReports
+                            .filter(student => 
+                               !selectedStudent || 
+                               student.name.toLowerCase().includes(selectedStudent.toLowerCase()) || 
+                               student.roll.toLowerCase().includes(selectedStudent.toLowerCase())
+                             )
+                            .map((student) => (
+                            <TableRow key={student.id}>
+                              <TableCell>
+                                <Badge variant="outline">{student.roll}</Badge>
+                              </TableCell>
+                              <TableCell className="font-medium">{student.name}</TableCell>
+                              <TableCell>{student.class}</TableCell>
+                              {selectedReportColumns.includes("total_periods_marked") && <TableCell>{student.total}</TableCell>}
+                              {selectedReportColumns.includes("total_present") && <TableCell>{student.present}</TableCell>}
+                              {selectedReportColumns.includes("attendance_percentage") && (
+                                <TableCell className="text-right">
+                                  <Badge 
+                                    variant={student.attendance > 90 ? "default" : student.attendance > 75 ? "secondary" : "destructive"}
+                                  >
+                                    {student.attendance}%
+                                  </Badge>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
 
             <div className="flex justify-end space-x-2">
               {currentUserRole === "admin" && (
-                <DeleteAllAttendanceDialog onDeleteComplete={fetchInitialData} />
+                <DeleteAllAttendanceDialog onDeleteComplete={handleResetData} />
               )}
-              <Button onClick={handleDownload}>
-                <Download className="mr-2 h-4 w-4" />
-                Download Report
-              </Button>
-            </div>
-          </TabsContent>
-          <TabsContent value="comprehensive-student-report">
-            {selectedClass === "all" ? (
-              <Card className="shadow-sm rounded-lg">
-                <CardContent className="p-6 text-center text-gray-500">
-                  Please select a specific class (semester) to view the comprehensive student report.
-                </CardContent>
-              </Card>
-            ) : (
-              <ComprehensiveStudentReport 
-                semesterId={parseInt(selectedClass)} 
-                startDate={dateRange.from} 
-                endDate={dateRange.to}
-                filterStudentTerm={selectedStudent} // Pass the filter term
-              />
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
-};
-
-export default Reports;
+              <Button onClick={handleDownload
