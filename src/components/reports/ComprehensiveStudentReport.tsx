@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getStudentsBySemester, getStudentDetailedAttendance, Student } from "@/lib/db";
-import Papa from "papaparse";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
@@ -16,7 +15,7 @@ interface ComprehensiveStudentReportProps {
   semesterId: number;
   startDate: string;
   endDate: string;
-  filterStudentTerm: string; // New prop to filter student dropdown
+  filterStudentTerm: string;
 }
 
 interface DetailedAttendanceRecord {
@@ -27,9 +26,19 @@ interface DetailedAttendanceRecord {
 
 interface DailyAttendance {
   [date: string]: {
-    [period: number]: boolean; // true for present, false for absent
+    [period: number]: boolean;
   };
 }
+
+// HELPER FUNCTION: Convert yyyy-mm-dd to dd/mm/yyyy
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+};
 
 const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStudentTerm }: ComprehensiveStudentReportProps) => {
   const [studentsInSemester, setStudentsInSemester] = useState<Student[]>([]);
@@ -39,10 +48,11 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Fetch students for the selected semester
+  // Fetch students ONLY when semester and dates are selected
   useEffect(() => {
     const fetchStudents = async () => {
-      if (!semesterId) {
+      // REQUIRE all three filters to be present before loading students
+      if (!semesterId || !startDate || !endDate) {
         setStudentsInSemester([]);
         setSelectedStudentId(null);
         return;
@@ -50,14 +60,13 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
       try {
         const students = await getStudentsBySemester(semesterId);
         setStudentsInSemester(students);
-        // If a student was previously selected and is still in the list, keep them.
-        // Otherwise, clear selection or select the first if available.
+        
+        // Keep current selection if it still exists in the new list, 
+        // otherwise default to null (no student auto-selected)
         if (selectedStudentId && students.some(s => s.id.toString() === selectedStudentId)) {
           // Keep current selection
-        } else if (students.length > 0) {
-          setSelectedStudentId(students[0].id.toString());
         } else {
-          setSelectedStudentId(null);
+          setSelectedStudentId(null); 
         }
       } catch (error: any) {
         toast({
@@ -70,12 +79,12 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
       }
     };
     fetchStudents();
-  }, [semesterId, toast]);
+  }, [semesterId, startDate, endDate, toast]);
 
   // Fetch detailed attendance for the selected student
   useEffect(() => {
     const fetchDetailedReport = async () => {
-      if (!selectedStudentId || !startDate || !endDate) { // Removed semesterId from condition
+      if (!selectedStudentId || !startDate || !endDate) { 
         setDetailedReportData([]);
         setOverallPercentage(0);
         return;
@@ -83,7 +92,6 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
 
       setIsLoading(true);
       try {
-        // NEW: Fetch the student's current semester_id
         const student = studentsInSemester.find(s => s.id.toString() === selectedStudentId);
         if (!student) {
           throw new Error("Selected student not found.");
@@ -92,7 +100,7 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
 
         const data = await getStudentDetailedAttendance(
           parseInt(selectedStudentId), 
-          studentCurrentSemesterId, // Use the student's current semester_id
+          studentCurrentSemesterId,
           startDate, 
           endDate
         );
@@ -118,7 +126,7 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
     };
 
     fetchDetailedReport();
-  }, [selectedStudentId, startDate, endDate, toast, studentsInSemester]); // Added studentsInSemester to dependencies
+  }, [selectedStudentId, startDate, endDate, toast, studentsInSemester]);
 
   const filteredStudents = useMemo(() => {
     if (!filterStudentTerm) {
@@ -144,7 +152,7 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
   }, [detailedReportData]);
 
   const dates = useMemo(() => Object.keys(dailyAttendance).sort(), [dailyAttendance]);
-  const periods = [1, 2, 3, 4, 5, 6]; // Assuming 6 periods
+  const periods = [1, 2, 3, 4, 5, 6]; 
 
   const handleDownload = () => {
     if (!selectedStudentId || detailedReportData.length === 0) {
@@ -161,7 +169,8 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
 
     const headers = ["Date", ...periods.map(p => `Period ${p}`), "Daily Status"];
     const csvRows = dates.map(date => {
-      const row: (string | boolean)[] = [date];
+      // Format date for CSV
+      const row: (string | boolean)[] = [formatDate(date)];
       let dailyPresentCount = 0;
       let dailyMarkedCount = 0;
 
@@ -183,7 +192,7 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
     const overallSummary = [
       `"Student Name","${student.name}"`,
       `"Roll Number","${student.roll_number}"`,
-      `"Semester","${student.semester_id}"`, // Assuming semester_id is enough, or fetch semester name
+      `"Semester","${student.semester_id}"`, 
       `"Overall Attendance Percentage","${overallPercentage}%"`
     ].join('\n');
 
@@ -191,7 +200,12 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `detailed_attendance_report_${student.roll_number}_${startDate}_to_${endDate}.csv`);
+    
+    // Format dates for file name
+    const safeStartDate = formatDate(startDate).replace(/\//g, '-');
+    const safeEndDate = formatDate(endDate).replace(/\//g, '-');
+    
+    link.setAttribute('download', `detailed_attendance_report_${student.roll_number}_${safeStartDate}_to_${safeEndDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -233,23 +247,31 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
         <div className="grid gap-4 mb-6">
           <div className="space-y-2">
             <Label htmlFor="select-student">Select Student</Label>
-            <Select value={selectedStudentId || ""} onValueChange={setSelectedStudentId} disabled={filteredStudents.length === 0}>
-              <SelectTrigger id="select-student">
-                <SelectValue placeholder="Select a student" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredStudents.map(student => (
-                  <SelectItem key={student.id} value={student.id.toString()}>
-                    {student.roll_number} - {student.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {filteredStudents.length === 0 && filterStudentTerm && (
-              <p className="text-sm text-red-500">No students found matching "{filterStudentTerm}" in this semester.</p>
-            )}
-            {filteredStudents.length === 0 && !filterStudentTerm && (
-              <p className="text-sm text-gray-500">No students available in this semester.</p>
+            {(!semesterId || !startDate || !endDate) ? (
+              <div className="p-3 bg-gray-50 border rounded-md text-sm text-gray-500">
+                Please select a Class and Date Range above to view students.
+              </div>
+            ) : (
+              <>
+                <Select value={selectedStudentId || ""} onValueChange={setSelectedStudentId} disabled={filteredStudents.length === 0}>
+                  <SelectTrigger id="select-student">
+                    <SelectValue placeholder="Select a student" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredStudents.map(student => (
+                      <SelectItem key={student.id} value={student.id.toString()}>
+                        {student.roll_number} - {student.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {filteredStudents.length === 0 && filterStudentTerm && (
+                  <p className="text-sm text-red-500">No students found matching "{filterStudentTerm}" in this semester.</p>
+                )}
+                {filteredStudents.length === 0 && !filterStudentTerm && (
+                  <p className="text-sm text-gray-500">No students available in this semester.</p>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -275,7 +297,7 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
             No attendance data available for the selected student in this date range.
           </div>
         ) : (
-          <div className="overflow-x-auto"> {/* Make table horizontally scrollable */}
+          <div className="overflow-x-auto"> 
             <Table>
               <TableHeader>
                 <TableRow>
@@ -303,7 +325,8 @@ const ComprehensiveStudentReport = ({ semesterId, startDate, endDate, filterStud
 
                   return (
                     <TableRow key={date}>
-                      <TableCell className="font-medium sticky left-0 bg-white z-10">{date}</TableCell>
+                      {/* Formatted Date Rendered Here */}
+                      <TableCell className="font-medium sticky left-0 bg-white z-10">{formatDate(date)}</TableCell>
                       {periods.map(period => (
                         <TableCell key={period} className="text-center">
                           {dailyRecords[period] === true ? (
