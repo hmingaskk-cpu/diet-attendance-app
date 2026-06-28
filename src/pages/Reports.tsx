@@ -488,4 +488,32 @@ const Reports = () => {
               {currentUserRole === "admin" && (
                 <DeleteAllAttendanceDialog onDeleteComplete={handleResetData} />
               )}
-              <Button onClick={handleDownload
+              <Button onClick={handleDownload} disabled={!activeFilters.class || studentReports.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                Download Report
+              </Button>
+            </div>
+          </TabsContent>
+          <TabsContent value="comprehensive-student-report">
+            {activeFilters.class === "all" || !activeFilters.class ? (
+              <Card className="shadow-sm rounded-lg">
+                <CardContent className="p-6 text-center text-gray-500">
+                  Please select a <strong>specific class</strong> (not 'All Classes') and <strong>Date Range</strong> to view the detailed report.
+                </CardContent>
+              </Card>
+            ) : (
+              <ComprehensiveStudentReport 
+                semesterId={parseInt(activeFilters.class)} 
+                startDate={activeFilters.from} 
+                endDate={activeFilters.to}
+                filterStudentTerm={selectedStudent} 
+              />
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default Reports;
