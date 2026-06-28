@@ -5,10 +5,10 @@ import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, Download, Plus, Search, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
@@ -25,44 +25,32 @@ const Students = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClass, setSelectedClass] = useState(initialClass); 
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isImportStudentsDialogOpen, setIsImportStudentsDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false); 
-  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<Student | null>(null); 
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any | null>(null); 
   const { toast } = useToast();
 
   const fetchStudentsAndSemesters = async () => {
     try {
       setIsLoading(true);
-      
-      const { data: semestersData, error: semestersError } = await supabase
-        .from('semesters')
-        .select('*')
-        .order('id');
-      
+      const { data: semestersData, error: semestersError } = await supabase.from('semesters').select('*').order('id');
       if (semestersError) throw semestersError;
       setSemesters(semestersData || []);
       
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
-        .select(`
-          *,
-          semester:semesters (name)
-        `)
+        .select('*, semester:semesters (name)')
         .order('semester_id', { ascending: true })
         .order('roll_number', { ascending: true });
       
       if (studentsError) throw studentsError;
       setStudents(studentsData || []);
     } catch (error: any) {
-      toast({
-        title: "Error loading data",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast({ title: "Error loading data", description: error.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -74,30 +62,19 @@ const Students = () => {
 
   useEffect(() => {
     const classFromUrl = searchParams.get("class");
-    if (classFromUrl) {
-      setSelectedClass(classFromUrl);
-    }
+    if (classFromUrl) setSelectedClass(classFromUrl);
   }, [searchParams]);
 
   const handleExport = () => {
     if (students.length === 0) {
-      toast({
-        title: "No Students to Export",
-        description: "There are no student records to export.",
-        variant: "destructive"
-      });
+      toast({ title: "No Students to Export", description: "There are no student records to export.", variant: "destructive" });
       return;
     }
 
-    // Updated headers to include Phone and Address
-    const headers = ["Roll Number", "Student Name", "Email", "Phone", "Address", "Semester"];
+    const headers = ["Roll Number", "Student Name", "Email", "Phone", "Address", "Semester", "Photo URL"];
     const csvRows = students.map(student => [
-      student.roll_number,
-      student.name,
-      student.email || "",
-      (student as any).phone_number || "",
-      (student as any).address || "",
-      (student as any).semester?.name || `Semester ${student.semester_id}`
+      student.roll_number, student.name, student.email || "", student.phone_number || "", student.address || "",
+      student.semester?.name || `Semester ${student.semester_id}`, student.profile_photo_url || ""
     ].map(field => `"${field}"`).join(',')); 
 
     const csvString = [headers.join(','), ...csvRows].join('\n');
@@ -109,44 +86,27 @@ const Students = () => {
     link.click();
     document.body.removeChild(link);
 
-    toast({
-      title: "Students Exported",
-      description: "Student data has been downloaded as students_data.csv.",
-    });
+    toast({ title: "Students Exported", description: "Student data has been downloaded." });
   };
 
-  const handleEditStudent = (student: Student) => {
+  const handleEditStudent = (student: any) => {
     setSelectedStudentForEdit(student);
     setIsEditStudentDialogOpen(true);
   };
 
   const handleDeleteStudent = async (id: number) => {
     try {
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', id);
-      
+      const { error } = await supabase.from('students').delete().eq('id', id);
       if (error) throw error;
-      
       fetchStudentsAndSemesters();
-      
-      toast({
-        title: "Student Deleted",
-        description: "The student has been successfully removed."
-      });
+      toast({ title: "Student Deleted", description: "The student has been successfully removed." });
     } catch (error: any) {
-      toast({
-        title: "Error deleting student",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast({ title: "Error deleting student", description: error.message, variant: "destructive" });
     }
   };
 
   const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          student.roll_number.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || student.roll_number.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesClass = selectedClass === "all" || student.semester_id === parseInt(selectedClass);
     return matchesSearch && matchesClass;
   });
@@ -168,7 +128,7 @@ const Students = () => {
       <div className="p-4 md:p-6 pb-20 md:pb-6"> 
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Student Management</h1>
-          <p className="text-gray-600">Manage student records and import/export data</p>
+          <p className="text-gray-600">Manage student records, profiles, and import/export data</p>
         </div>
 
         <Card className="shadow-sm rounded-lg">
@@ -176,23 +136,12 @@ const Students = () => {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
                 <CardTitle>Student Records</CardTitle>
-                <CardDescription>
-                  View and manage student information
-                </CardDescription>
+                <CardDescription>View and manage student information</CardDescription>
               </div>
               <div className="flex flex-wrap gap-2"> 
-                <Button onClick={() => setIsImportStudentsDialogOpen(true)} variant="outline">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Import
-                </Button>
-                <Button onClick={handleExport} variant="outline">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </Button>
-                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Student
-                </Button>
+                <Button onClick={() => setIsImportStudentsDialogOpen(true)} variant="outline"><Upload className="mr-2 h-4 w-4" />Import</Button>
+                <Button onClick={handleExport} variant="outline"><Download className="mr-2 h-4 w-4" />Export</Button>
+                <Button onClick={() => setIsAddStudentDialogOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Student</Button>
               </div>
             </div>
           </CardHeader>
@@ -201,26 +150,15 @@ const Students = () => {
               <div className="md:col-span-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search students by name or roll number..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+                  <Input placeholder="Search students by name or roll number..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
                 </div>
               </div>
               <div>
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by class" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Filter by class" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Classes</SelectItem>
-                    {semesters.map(semester => (
-                      <SelectItem key={semester.id} value={semester.id.toString()}>
-                        {semester.name}
-                      </SelectItem>
-                    ))}
+                    {semesters.map(semester => (<SelectItem key={semester.id} value={semester.id.toString()}>{semester.name}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -231,7 +169,7 @@ const Students = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Roll No.</TableHead>
-                    <TableHead>Student Name</TableHead>
+                    <TableHead>Student</TableHead>
                     <TableHead>Class</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
@@ -246,13 +184,21 @@ const Students = () => {
                         <TableCell>
                           <Badge variant="outline">{student.roll_number}</Badge>
                         </TableCell>
-                        <TableCell className="font-medium">{student.name}</TableCell>
-                        <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
-                        <TableCell>{student.email || "-"}</TableCell>
-                        <TableCell>{(student as any).phone_number || "-"}</TableCell>
-                        <TableCell className="max-w-[150px] truncate" title={(student as any).address || ""}>
-                          {(student as any).address || "-"}
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9 border">
+                              <AvatarImage src={student.profile_photo_url || ""} />
+                              <AvatarFallback className="bg-blue-50 text-blue-700 text-xs">
+                                {student.name.substring(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{student.name}</span>
+                          </div>
                         </TableCell>
+                        <TableCell>{student.semester?.name || `Semester ${student.semester_id}`}</TableCell>
+                        <TableCell>{student.email || "-"}</TableCell>
+                        <TableCell>{student.phone_number || "-"}</TableCell>
+                        <TableCell className="max-w-[150px] truncate" title={student.address || ""}>{student.address || "-"}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end space-x-2">
                             <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
@@ -260,20 +206,12 @@ const Students = () => {
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <Button variant="outline" size="sm"><Trash2 className="h-4 w-4" /></Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the student 
-                                    record and any associated attendance data.
-                                  </AlertDialogDescription>
+                                  <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -287,10 +225,7 @@ const Students = () => {
                     ))
                   ) : (
                     <TableRow>
-                      {/* Note: colSpan increased to 7 to match the new number of columns */}
-                      <TableCell colSpan={7} className="text-center py-6 text-gray-500">
-                        No students found.
-                      </TableCell>
+                      <TableCell colSpan={7} className="text-center py-6 text-gray-500">No students found.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -299,22 +234,9 @@ const Students = () => {
           </CardContent>
         </Card>
       </div>
-      <AddStudentDialog 
-        isOpen={isAddStudentDialogOpen} 
-        onClose={() => setIsAddStudentDialogOpen(false)} 
-        onStudentAdded={fetchStudentsAndSemesters} 
-      />
-      <ImportStudentsDialog 
-        isOpen={isImportStudentsDialogOpen} 
-        onClose={() => setIsImportStudentsDialogOpen(false)} 
-        onImportComplete={fetchStudentsAndSemesters} 
-      />
-      <EditStudentDialog
-        isOpen={isEditStudentDialogOpen}
-        onClose={() => setIsEditStudentDialogOpen(false)}
-        student={selectedStudentForEdit}
-        onStudentUpdated={fetchStudentsAndSemesters}
-      />
+      <AddStudentDialog isOpen={isAddStudentDialogOpen} onClose={() => setIsAddStudentDialogOpen(false)} onStudentAdded={fetchStudentsAndSemesters} />
+      <ImportStudentsDialog isOpen={isImportStudentsDialogOpen} onClose={() => setIsImportStudentsDialogOpen(false)} onImportComplete={fetchStudentsAndSemesters} />
+      <EditStudentDialog isOpen={isEditStudentDialogOpen} onClose={() => setIsEditStudentDialogOpen(false)} student={selectedStudentForEdit} onStudentUpdated={fetchStudentsAndSemesters} />
     </div>
   );
 };
