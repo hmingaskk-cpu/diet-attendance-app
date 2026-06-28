@@ -22,6 +22,7 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
 
 const editStudentFormSchema = z.object({
   name: z.string().min(2, {
@@ -37,6 +38,8 @@ const editStudentFormSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
   }).optional().or(z.literal("")),
+  phoneNumber: z.string().optional().or(z.literal("")),
+  address: z.string().optional().or(z.literal("")),
   semesterId: z.string().min(1, {
     message: "Please select a semester.",
   }),
@@ -50,7 +53,7 @@ type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
 interface EditStudentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  student: Student | null;
+  student: any; // Using any temporarily here since we are pulling new dynamic DB fields
   onStudentUpdated: () => void;
 }
 
@@ -66,6 +69,8 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
       name: "",
       rollNumber: "",
       email: "",
+      phoneNumber: "",
+      address: "",
       semesterId: "",
       optionalSubject4th: "none",
       optionalSubject2nd_1: "none",
@@ -97,18 +102,18 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
     if (isOpen) {
       fetchData();
       if (student) {
-        // Preset basic values
         form.reset({
-          name: student.name,
-          rollNumber: student.roll_number,
+          name: student.name || "",
+          rollNumber: student.roll_number || "",
           email: student.email || "",
-          semesterId: student.semester_id.toString(),
+          phoneNumber: student.phone_number || "",
+          address: student.address || "",
+          semesterId: student.semester_id?.toString() || "",
           optionalSubject4th: "none",
           optionalSubject2nd_1: "none",
           optionalSubject2nd_2: "none",
         });
 
-        // Load existing subjects if they are in 2nd or 4th sem
         if (student.semester_id === 2 || student.semester_id === 4) {
           supabase
             .from('student_subjects')
@@ -135,23 +140,21 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
     setIsLoading(true);
 
     try {
-      // 1. Update core student details
       await updateStudent(student.id, {
         name: values.name,
         roll_number: values.rollNumber,
         email: values.email || null,
+        phone_number: values.phoneNumber || null,
+        address: values.address || null,
         semester_id: parseInt(values.semesterId),
         updated_at: new Date().toISOString(),
       });
 
-      // 2. Clear ALL existing subjects for this student to prevent duplicate conflict errors
       await supabase.from('student_subjects').delete().eq('student_id', student.id);
 
-      // 3. Assign new Optional Subjects 
       const subjectInserts: { student_id: number, semester_id: number, subject_id: number }[] = [];
 
       if (isSecondSemester) {
-        // Use a Set to make sure we don't accidentally try to insert the exact same subject twice
         const uniqueSubjects = new Set<string>();
         if (values.optionalSubject2nd_1 && values.optionalSubject2nd_1 !== "none") uniqueSubjects.add(values.optionalSubject2nd_1);
         if (values.optionalSubject2nd_2 && values.optionalSubject2nd_2 !== "none") uniqueSubjects.add(values.optionalSubject2nd_2);
@@ -165,7 +168,6 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
         }
       }
 
-      // 4. Save to database
       if (subjectInserts.length > 0) {
         const { error: insertError } = await supabase.from('student_subjects').insert(subjectInserts);
         if (insertError) throw insertError;
@@ -227,19 +229,50 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                   </FormItem>
                 )}
               />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="john@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="1234567890" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
-                name="email"
+                name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email (Optional)</FormLabel>
+                    <FormLabel>Address (Optional)</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="john.doe@example.com" {...field} />
+                      <Textarea placeholder="123 Main St..." className="resize-none h-16" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="semesterId"
@@ -265,7 +298,6 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                 )}
               />
               
-              {/* 2nd Semester Subject Options */}
               {isSecondSemester && (
                 <div className="p-3 mt-2 border rounded-md bg-gray-50/50 space-y-4">
                   <h4 className="font-medium text-sm text-gray-700">Optional Subjects (Select up to 2)</h4>
@@ -312,7 +344,6 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                 </div>
               )}
 
-              {/* 4th Semester Subject Options */}
               {isFourthSemester && (
                 <FormField
                   control={form.control}
