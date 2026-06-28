@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Download, Filter, ListFilter } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { Semester, Student, getStudentDetailedAttendance } from "@/lib/db";
+import { Semester, Student } from "@/lib/db";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ComprehensiveStudentReport from "@/components/reports/ComprehensiveStudentReport";
 import DeleteAllAttendanceDialog from "@/components/reports/DeleteAllAttendanceDialog";
@@ -121,29 +121,44 @@ const Reports = () => {
       }> = {};
 
       if (classId !== "all") {
+        // --- OPTIMIZED BULK FETCHING LOGIC ---
         const studentsInSelectedSemester = students.filter(s => s.semester_id.toString() === classId);
+        const className = semesters.find(s => s.id.toString() === classId)?.name || "Unknown";
         
+        // 1. Initialize all students with 0 attendance so they still show up if they have no records
         for (const student of studentsInSelectedSemester) {
-          const detailedAttendance = await getStudentDetailedAttendance(
-            student.id,
-            parseInt(classId),
-            fromDate,
-            toDate
-          );
-
-          const totalPeriods = detailedAttendance.length;
-          const periodsPresent = detailedAttendance.filter(record => record.is_present).length;
-          
           studentReportsMap[student.id] = {
             id: student.id,
             name: student.name,
             roll: student.roll_number,
-            class: semesters.find(s => s.id.toString() === classId)?.name || "Unknown",
-            total: totalPeriods,
-            present: periodsPresent
+            class: className,
+            total: 0,
+            present: 0
           };
         }
+
+        // 2. Fetch ALL attendance records for this class and date range in ONE single request
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance_records')
+          .select('student_id, is_present')
+          .eq('semester_id', classId)
+          .gte('date', fromDate)
+          .lte('date', toDate);
+
+        if (attendanceError) throw attendanceError;
+
+        // 3. Tally up the totals instantly in memory
+        attendanceData?.forEach(record => {
+          const studentId = record.student_id;
+          if (studentReportsMap[studentId]) {
+            studentReportsMap[studentId].total += 1;
+            if (record.is_present) {
+              studentReportsMap[studentId].present += 1;
+            }
+          }
+        });
       } else {
+        // "All Classes" logic (already optimized to use a single request)
         const { data: allAttendanceRecords, error: allAttendanceError } = await supabase
           .from('attendance_records')
           .select(`
@@ -177,6 +192,7 @@ const Reports = () => {
         });
       }
 
+      // Calculate final percentages
       const generatedReports = Object.values(studentReportsMap).map(student => ({
         ...student,
         attendance: student.total > 0 ? Math.round((student.present / student.total) * 100) : 0
@@ -427,7 +443,6 @@ const Reports = () => {
                 </CardHeader>
                 <CardContent>
                   
-                  {/* HIDDEN LOGIC IMPLEMENTED HERE */}
                   {(!activeFilters.from || !activeFilters.to || !activeFilters.class) ? (
                     <div className="text-center p-8 text-gray-500 border rounded-lg bg-gray-50">
                       Please select a Class and Date Range above, then click <strong>Generate Report</strong> to view students.
