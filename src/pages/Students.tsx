@@ -89,11 +89,14 @@ const Students = () => {
       return;
     }
 
-    const headers = ["Roll Number", "Student Name", "Email", "Semester"];
+    // Updated headers to include Phone and Address
+    const headers = ["Roll Number", "Student Name", "Email", "Phone", "Address", "Semester"];
     const csvRows = students.map(student => [
       student.roll_number,
       student.name,
       student.email || "",
+      (student as any).phone_number || "",
+      (student as any).address || "",
       (student as any).semester?.name || `Semester ${student.semester_id}`
     ].map(field => `"${field}"`).join(',')); 
 
@@ -231,6 +234,8 @@ const Students = () => {
                     <TableHead>Student Name</TableHead>
                     <TableHead>Class</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Address</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -244,6 +249,10 @@ const Students = () => {
                         <TableCell className="font-medium">{student.name}</TableCell>
                         <TableCell>{(student as any).semester?.name || `Semester ${student.semester_id}`}</TableCell>
                         <TableCell>{student.email || "-"}</TableCell>
+                        <TableCell>{(student as any).phone_number || "-"}</TableCell>
+                        <TableCell className="max-w-[150px] truncate" title={(student as any).address || ""}>
+                          {(student as any).address || "-"}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end space-x-2">
                             <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
@@ -278,7 +287,8 @@ const Students = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                      {/* Note: colSpan increased to 7 to match the new number of columns */}
+                      <TableCell colSpan={7} className="text-center py-6 text-gray-500">
                         No students found.
                       </TableCell>
                     </TableRow>
