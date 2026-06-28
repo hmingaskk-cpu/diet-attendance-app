@@ -1,19 +1,17 @@
 import { supabase } from '@/lib/supabaseClient'
 import { Database } from '@/types/supabase'
 
-// Type definitions for our tables
 export type User = Database['public']['Tables']['users']['Row']
 export type Semester = Database['public']['Tables']['semesters']['Row']
 export type Student = Database['public']['Tables']['students']['Row']
 export type AttendanceRecord = Database['public']['Tables']['attendance_records']['Row']
-export type Subject = Database['public']['Tables']['subjects']['Row'] // New type
-export type StudentSubject = Database['public']['Tables']['student_subjects']['Row'] // New type
+export type Subject = Database['public']['Tables']['subjects']['Row'] 
+export type StudentSubject = Database['public']['Tables']['student_subjects']['Row'] 
 
-// User operations
 export const getUsers = async () => {
   const { data, error } = await supabase
     .from('users')
-    .select('*, abbreviation') // Select abbreviation
+    .select('*, abbreviation') 
     .order('name')
   
   if (error) throw error
@@ -23,7 +21,7 @@ export const getUsers = async () => {
 export const getUserById = async (id: string) => {
   const { data, error } = await supabase
     .from('users')
-    .select('*, abbreviation') // Select abbreviation
+    .select('*, abbreviation') 
     .eq('id', id)
     .single()
   
@@ -31,7 +29,6 @@ export const getUserById = async (id: string) => {
   return data
 }
 
-// Semester operations
 export const getSemesters = async () => {
   const { data, error } = await supabase
     .from('semesters')
@@ -42,7 +39,6 @@ export const getSemesters = async () => {
   return data
 }
 
-// Subject operations (New)
 export const getSubjects = async () => {
   const { data, error } = await supabase
     .from('subjects')
@@ -56,18 +52,16 @@ export const getSubjects = async () => {
   return data;
 }
 
-// Student operations
 export const getStudentsBySemester = async (semesterId: number, subjectId?: number) => {
   let query = supabase
     .from('students')
     .select(`
-      id, name, roll_number, email, semester_id
+      id, name, roll_number, email, semester_id, phone_number, address
     `)
     .eq('semester_id', semesterId)
     .order('roll_number');
   
   if (subjectId) {
-    // If a subjectId is provided, we need to filter students who are linked to this subject
     const { data: studentSubjectsData, error: studentSubjectsError } = await supabase
       .from('student_subjects')
       .select('student_id')
@@ -86,7 +80,6 @@ export const getStudentsBySemester = async (semesterId: number, subjectId?: numb
   return data;
 }
 
-// New function to get students who are in 4th semester but have NO optional subject assigned
 export const getStudentsWithoutOptionalSubject = async (semesterId: number) => {
   const { data: studentsWithSubjects, error: studentsWithSubjectsError } = await supabase
     .from('student_subjects')
@@ -100,7 +93,7 @@ export const getStudentsWithoutOptionalSubject = async (semesterId: number) => {
   let query = supabase
     .from('students')
     .select(`
-      id, name, roll_number, email, semester_id
+      id, name, roll_number, email, semester_id, phone_number, address
     `)
     .eq('semester_id', semesterId)
     .order('roll_number');
@@ -108,8 +101,6 @@ export const getStudentsWithoutOptionalSubject = async (semesterId: number) => {
   if (studentIdsWithSubjects.length > 0) {
     query = query.not('id', 'in', `(${studentIdsWithSubjects.join(',')})`);
   }
-  // If studentIdsWithSubjects is empty, it means no students have optional subjects,
-  // so the 'not in' filter is not needed, and all students in the semester will be returned.
 
   const { data, error } = await query;
 
@@ -117,8 +108,7 @@ export const getStudentsWithoutOptionalSubject = async (semesterId: number) => {
   return data;
 }
 
-
-export const createStudent = async (student: Omit<Student, 'id' | 'created_at' | 'updated_at'>) => {
+export const createStudent = async (student: any) => {
   const { data, error } = await supabase
     .from('students')
     .insert(student)
@@ -129,7 +119,7 @@ export const createStudent = async (student: Omit<Student, 'id' | 'created_at' |
   return data
 }
 
-export const createMultipleStudents = async (students: Omit<Student, 'id' | 'created_at' | 'updated_at'>[]) => {
+export const createMultipleStudents = async (students: any[]) => {
   const { data, error } = await supabase
     .from('students')
     .insert(students)
@@ -139,7 +129,7 @@ export const createMultipleStudents = async (students: Omit<Student, 'id' | 'cre
   return data
 }
 
-export const updateStudent = async (id: number, student: Partial<Student>) => {
+export const updateStudent = async (id: number, student: any) => {
   const { data, error } = await supabase
     .from('students')
     .update(student)
@@ -160,7 +150,6 @@ export const deleteStudent = async (id: number) => {
   if (error) throw error
 }
 
-// Student Subject operations (New)
 export const getStudentOptionalSubject = async (studentId: number, semesterId: number) => {
   const { data, error } = await supabase
     .from('student_subjects')
@@ -169,7 +158,7 @@ export const getStudentOptionalSubject = async (studentId: number, semesterId: n
     .eq('semester_id', semesterId)
     .single();
 
-  if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+  if (error && error.code !== 'PGRST116') {
     throw error;
   }
   return data ? data.subject_id : null;
@@ -196,8 +185,6 @@ export const removeStudentOptionalSubject = async (studentId: number, semesterId
   if (error) throw error;
 }
 
-
-// Attendance operations
 export const getAttendanceRecords = async (date: string, period: number, semesterId: number) => {
   const { data, error } = await supabase
     .from('attendance_records')
@@ -250,12 +237,11 @@ export const deleteAllAttendanceRecords = async () => {
   const { error } = await supabase
     .from('attendance_records')
     .delete()
-    .neq('id', 0); // Delete all records where id is not 0 (i.e., all records)
+    .neq('id', 0); 
   
   if (error) throw error;
 }
 
-// Report operations
 export const getAttendanceReport = async (startDate: string, endDate: string, semesterId?: number) => {
   let query = supabase
     .from('attendance_records')
