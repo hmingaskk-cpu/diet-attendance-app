@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Upload, Download, Plus, Search, Edit, Trash2, Mail, Phone, MapPin, Hash } from "lucide-react";
+import { Upload, Download, Plus, Search, Edit, Trash2, Mail, Phone, MapPin, Hash, GraduationCap, Calendar as CalendarIcon, Users, CreditCard } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Student, Semester } from "@/lib/db";
@@ -20,9 +20,16 @@ import EditStudentDialog from "@/components/students/EditStudentDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; 
 import LoadingSkeleton from "@/components/LoadingSkeleton"; 
 
+// Helper function to format dates to dd/mm/yyyy
+const formatDOB = (dateStr: string) => {
+  if (!dateStr) return "Not provided";
+  const parts = dateStr.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+};
+
 const Students = () => {
   const [searchParams] = useSearchParams();
-  // We use "" as the initial class so that the "Select Class" placeholder is shown by default
   const initialClass = searchParams.get("class") || "";
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,13 +38,11 @@ const Students = () => {
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Dialog States
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isImportStudentsDialogOpen, setIsImportStudentsDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false); 
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any | null>(null); 
   
-  // New State for Viewing Student Profile
   const [isViewStudentDialogOpen, setIsViewStudentDialogOpen] = useState(false);
   const [selectedStudentForView, setSelectedStudentForView] = useState<any | null>(null);
 
@@ -74,22 +79,21 @@ const Students = () => {
     if (classFromUrl) setSelectedClass(classFromUrl);
   }, [searchParams]);
 
-  // Handle clicking a row to view the profile
   const handleRowClick = (student: any) => {
     setSelectedStudentForView(student);
     setIsViewStudentDialogOpen(true);
   };
 
   const handleExport = () => {
-    // We now export only the filtered students (the class currently being viewed)
     if (filteredStudents.length === 0) {
       toast({ title: "No Students to Export", description: "There are no student records to export for this class.", variant: "destructive" });
       return;
     }
 
-    const headers = ["Roll Number", "Student Name", "Email", "Phone", "Address", "Semester", "Photo URL"];
+    const headers = ["Roll Number", "Student Name", "Email", "Phone", "Address", "Qualification", "DOB", "Parent Name", "Aadhaar", "Semester", "Photo URL"];
     const csvRows = filteredStudents.map(student => [
       student.roll_number, student.name, student.email || "", student.phone_number || "", student.address || "",
+      student.qualification || "", student.date_of_birth || "", student.parent_name || "", student.aadhaar_number || "",
       student.semester?.name || `Semester ${student.semester_id}`, student.profile_photo_url || ""
     ].map(field => `"${field}"`).join(',')); 
 
@@ -121,7 +125,6 @@ const Students = () => {
     }
   };
 
-  // Only populate filteredStudents if a class is actually selected
   const filteredStudents = selectedClass === "" ? [] : students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || student.roll_number.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesClass = selectedClass === "all" || student.semester_id === parseInt(selectedClass);
@@ -172,12 +175,11 @@ const Students = () => {
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)} 
                     className="pl-10" 
-                    disabled={selectedClass === ""} // Disable search if no class is selected
+                    disabled={selectedClass === ""} 
                   />
                 </div>
               </div>
               <div>
-                {/* Fallback added using `|| undefined` to ensure the placeholder works perfectly in shadcn */}
                 <Select value={selectedClass || undefined} onValueChange={setSelectedClass}>
                   <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
                   <SelectContent>
@@ -234,7 +236,6 @@ const Students = () => {
                         <TableCell>{student.phone_number || "-"}</TableCell>
                         <TableCell className="max-w-[150px] truncate" title={student.address || ""}>{student.address || "-"}</TableCell>
                         
-                        {/* Stop propagation on the actions cell so clicking a button doesn't open the profile dialog */}
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end space-x-2">
                             <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
@@ -271,19 +272,16 @@ const Students = () => {
         </Card>
       </div>
 
-      {/* Add / Edit / Import Dialogs */}
       <AddStudentDialog isOpen={isAddStudentDialogOpen} onClose={() => setIsAddStudentDialogOpen(false)} onStudentAdded={fetchStudentsAndSemesters} />
       <ImportStudentsDialog isOpen={isImportStudentsDialogOpen} onClose={() => setIsImportStudentsDialogOpen(false)} onImportComplete={fetchStudentsAndSemesters} />
       <EditStudentDialog isOpen={isEditStudentDialogOpen} onClose={() => setIsEditStudentDialogOpen(false)} student={selectedStudentForEdit} onStudentUpdated={fetchStudentsAndSemesters} />
       
-      {/* New: View Student Profile Dialog */}
+      {/* Student Profile Dialog (With New Details) */}
       <Dialog open={isViewStudentDialogOpen} onOpenChange={setIsViewStudentDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-center text-xl">Student Profile</DialogTitle>
-            <DialogDescription className="text-center hidden">
-              Detailed view of the student.
-            </DialogDescription>
+            <DialogDescription className="text-center hidden">Detailed view of the student.</DialogDescription>
           </DialogHeader>
           
           {selectedStudentForView && (
@@ -303,35 +301,77 @@ const Students = () => {
               </div>
               
               <div className="w-full space-y-4 mt-2 px-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 text-blue-700 rounded-full"><Hash className="h-4 w-4" /></div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Roll Number</span>
-                    <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.roll_number}</span>
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Row 1 */}
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 text-blue-700 rounded-full"><Hash className="h-4 w-4" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Roll Number</span>
+                      <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.roll_number}</span>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 text-purple-700 rounded-full"><Mail className="h-4 w-4" /></div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</span>
-                    <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.email || "Not provided"}</span>
+                  
+                  {/* Row 2 */}
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 text-indigo-700 rounded-full"><GraduationCap className="h-4 w-4" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Qualification</span>
+                      <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.qualification || "Not provided"}</span>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 text-green-700 rounded-full"><Phone className="h-4 w-4" /></div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Phone Number</span>
-                    <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.phone_number || "Not provided"}</span>
+
+                  {/* Row 3 */}
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-pink-100 text-pink-700 rounded-full"><CalendarIcon className="h-4 w-4" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Date of Birth</span>
+                      <span className="text-sm font-semibold text-gray-900">{formatDOB(selectedStudentForView.date_of_birth)}</span>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 text-orange-700 rounded-full"><MapPin className="h-4 w-4" /></div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Home Address</span>
-                    <span className="text-sm font-semibold text-gray-900 leading-tight mt-0.5">{selectedStudentForView.address || "Not provided"}</span>
+
+                  {/* Row 4 */}
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 text-purple-700 rounded-full"><Mail className="h-4 w-4" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</span>
+                      <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.email || "Not provided"}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Row 5 */}
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 text-green-700 rounded-full"><Phone className="h-4 w-4" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Phone Number</span>
+                      <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.phone_number || "Not provided"}</span>
+                    </div>
+                  </div>
+
+                  {/* Row 6 */}
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-teal-100 text-teal-700 rounded-full"><Users className="h-4 w-4" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Name</span>
+                      <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.parent_name || "Not provided"}</span>
+                    </div>
+                  </div>
+
+                  {/* Row 7 */}
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-yellow-100 text-yellow-700 rounded-full"><CreditCard className="h-4 w-4" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Aadhaar Number</span>
+                      <span className="text-sm font-semibold text-gray-900">{selectedStudentForView.aadhaar_number || "Not provided"}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Row 8 */}
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-100 text-orange-700 rounded-full"><MapPin className="h-4 w-4" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Home Address</span>
+                      <span className="text-sm font-semibold text-gray-900 leading-tight mt-0.5">{selectedStudentForView.address || "Not provided"}</span>
+                    </div>
                   </div>
                 </div>
               </div>
