@@ -36,7 +36,8 @@ export const getStudentsBySemester = async (semesterId: number, subjectId?: numb
   let query = supabase
     .from('students')
     .select(`
-      id, name, roll_number, email, semester_id, phone_number, address, profile_photo_url
+      id, name, roll_number, email, semester_id, phone_number, address, profile_photo_url,
+      qualification, date_of_birth, parent_name, aadhaar_number
     `)
     .eq('semester_id', semesterId)
     .order('roll_number');
@@ -68,7 +69,8 @@ export const getStudentsWithoutOptionalSubject = async (semesterId: number) => {
   let query = supabase
     .from('students')
     .select(`
-      id, name, roll_number, email, semester_id, phone_number, address, profile_photo_url
+      id, name, roll_number, email, semester_id, phone_number, address, profile_photo_url,
+      qualification, date_of_birth, parent_name, aadhaar_number
     `)
     .eq('semester_id', semesterId)
     .order('roll_number');
