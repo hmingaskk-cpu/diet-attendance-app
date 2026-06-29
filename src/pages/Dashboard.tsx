@@ -26,58 +26,62 @@ const Dashboard = () => {
         setIsLoading(true); 
         
         const { data: { user } } = await supabase.auth.getUser();
+        
         if (user) {
-          
-          const { data: userDetails, error: userError } = await supabase
-            .from('users')
-            .select('name, role')
-            .eq('id', user.id)
-            .single();
-          
-          if (userError) throw userError;
-          
-          setFacultyName(userDetails?.name || "Faculty");
-          setRole(userDetails?.role || "Faculty");
-          
-          const { data: semestersData, error: semestersError } = await supabase
-            .from('semesters')
-            .select('*')
-            .order('id');
-          
-          if (semestersError) throw semestersError;
-          setSemesters(semestersData || []);
-          
-          const counts: Record<number, number> = {};
-          for (const semester of semestersData || []) {
-            const { count, error } = await supabase
-              .from('students')
-              .select('*', { count: 'exact', head: true })
-              .eq('semester_id', semester.id);
-            
-            if (error) throw error;
-            counts[semester.id] = count || 0;
-          }
-          setStudentCounts(counts);
-          
           const today = new Date().toISOString().split('T')[0];
-          const { data: distinctPeriodsData, error: distinctPeriodsError } = await supabase
-            .from('attendance_records')
-            .select('period', { distinct: true })
-            .eq('date', today);
-          
-          if (distinctPeriodsError) throw distinctPeriodsError;
-          setTodayAttendanceCount(distinctPeriodsData?.length || 0);
-          
           const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
             .toISOString().split('T')[0];
+
+          // 1. Fetch all independent high-level data in parallel
+          const [
+            userDetailsRes,
+            semestersRes,
+            distinctPeriodsRes,
+            monthlyCountRes
+          ] = await Promise.all([
+            supabase.from('users').select('name, role').eq('id', user.id).single(),
+            supabase.from('semesters').select('*').order('id'),
+            supabase.from('attendance_records').select('period', { distinct: true }).eq('date', today),
+            supabase.from('attendance_records').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonth)
+          ]);
+
+          // Check for errors in the parallel fetches
+          if (userDetailsRes.error) throw userDetailsRes.error;
+          if (semestersRes.error) throw semestersRes.error;
+          if (distinctPeriodsRes.error) throw distinctPeriodsRes.error;
+          if (monthlyCountRes.error) throw monthlyCountRes.error;
+
+          setFacultyName(userDetailsRes.data?.name || "Faculty");
+          setRole(userDetailsRes.data?.role || "Faculty");
           
-          const { count: monthlyCount, error: monthlyError } = await supabase
-            .from('attendance_records')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', firstDayOfMonth); 
+          const fetchedSemesters = semestersRes.data || [];
+          setSemesters(fetchedSemesters);
           
-          if (monthlyError) throw monthlyError;
-          setMonthlyAttendanceEntriesCount(monthlyCount || 0); 
+          setTodayAttendanceCount(distinctPeriodsRes.data?.length || 0);
+          setMonthlyAttendanceEntriesCount(monthlyCountRes.count || 0); 
+
+          // 2. Fetch student counts for all semesters concurrently (Fixing the N+1 loop)
+          if (fetchedSemesters.length > 0) {
+            const countPromises = fetchedSemesters.map(async (semester) => {
+              const { count, error } = await supabase
+                .from('students')
+                .select('*', { count: 'exact', head: true })
+                .eq('semester_id', semester.id);
+              
+              if (error) throw error;
+              return { id: semester.id, count: count || 0 };
+            });
+
+            const countResults = await Promise.all(countPromises);
+            
+            // Format array of results back into the expected Record object
+            const counts: Record<number, number> = {};
+            countResults.forEach(({ id, count }) => {
+              counts[id] = count;
+            });
+            
+            setStudentCounts(counts);
+          }
         }
       } catch (error: any) {
         toast({
