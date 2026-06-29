@@ -10,10 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Upload, Download, Plus, Search, Edit, Trash2, Mail, Phone, MapPin, Hash, GraduationCap, Calendar as CalendarIcon, Users, CreditCard } from "lucide-react";
+import { Upload, Download, Plus, Search, Edit, Trash2, Mail, Phone, MapPin, Hash, GraduationCap, Calendar as CalendarIcon, Users, CreditCard, PieChart } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { Student, Semester } from "@/lib/db";
+import { Semester } from "@/lib/db";
 import AddStudentDialog from "@/components/students/AddStudentDialog";
 import ImportStudentsDialog from "@/components/students/ImportStudentsDialog";
 import EditStudentDialog from "@/components/students/EditStudentDialog"; 
@@ -45,6 +45,10 @@ const Students = () => {
   
   const [isViewStudentDialogOpen, setIsViewStudentDialogOpen] = useState(false);
   const [selectedStudentForView, setSelectedStudentForView] = useState<any | null>(null);
+
+  // New States for Attendance Calculation
+  const [studentAttendancePercentage, setStudentAttendancePercentage] = useState<number | null>(null);
+  const [isFetchingAttendance, setIsFetchingAttendance] = useState(false);
 
   const { toast } = useToast();
 
@@ -79,9 +83,32 @@ const Students = () => {
     if (classFromUrl) setSelectedClass(classFromUrl);
   }, [searchParams]);
 
-  const handleRowClick = (student: any) => {
+  // Handle opening the profile card and calculating attendance on the fly
+  const handleRowClick = async (student: any) => {
     setSelectedStudentForView(student);
     setIsViewStudentDialogOpen(true);
+    setStudentAttendancePercentage(null); // Reset from previous views
+    setIsFetchingAttendance(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('is_present')
+        .eq('student_id', student.id)
+        .eq('semester_id', student.semester_id); // Calculate only for their CURRENT class
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const total = data.length;
+        const present = data.filter((r) => r.is_present).length;
+        setStudentAttendancePercentage(Math.round((present / total) * 100));
+      }
+    } catch (err) {
+      console.error("Error fetching attendance for profile:", err);
+    } finally {
+      setIsFetchingAttendance(false);
+    }
   };
 
   const handleExport = () => {
@@ -276,7 +303,7 @@ const Students = () => {
       <ImportStudentsDialog isOpen={isImportStudentsDialogOpen} onClose={() => setIsImportStudentsDialogOpen(false)} onImportComplete={fetchStudentsAndSemesters} />
       <EditStudentDialog isOpen={isEditStudentDialogOpen} onClose={() => setIsEditStudentDialogOpen(false)} student={selectedStudentForEdit} onStudentUpdated={fetchStudentsAndSemesters} />
       
-      {/* Student Profile Dialog (With New Details) */}
+      {/* Student Profile Dialog */}
       <Dialog open={isViewStudentDialogOpen} onOpenChange={setIsViewStudentDialogOpen}>
         <DialogContent className="sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -302,7 +329,31 @@ const Students = () => {
               
               <div className="w-full space-y-4 mt-2 px-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
                 <div className="grid grid-cols-1 gap-4">
-                  {/* Row 1 */}
+                  
+                  {/* NEW: Live Attendance Row */}
+                  <div className="flex items-center gap-3 bg-white p-3 rounded-lg border shadow-sm">
+                    <div className="p-2 bg-blue-50 text-blue-600 rounded-full"><PieChart className="h-5 w-5" /></div>
+                    <div className="flex flex-col flex-1">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Current Attendance</span>
+                      {isFetchingAttendance ? (
+                        <span className="text-sm font-semibold text-gray-400">Calculating...</span>
+                      ) : studentAttendancePercentage !== null ? (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-lg font-bold text-gray-900">{studentAttendancePercentage}%</span>
+                          <Badge 
+                            variant={studentAttendancePercentage >= 75 ? "default" : "destructive"} 
+                            className="text-[10px] px-2 py-0 h-5"
+                          >
+                            {studentAttendancePercentage >= 75 ? "Good Standing" : "Needs Attention"}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-sm font-semibold text-gray-500">No data for this class</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Rest of the data rows... */}
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-100 text-blue-700 rounded-full"><Hash className="h-4 w-4" /></div>
                     <div className="flex flex-col">
@@ -311,7 +362,6 @@ const Students = () => {
                     </div>
                   </div>
                   
-                  {/* Row 2 */}
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-indigo-100 text-indigo-700 rounded-full"><GraduationCap className="h-4 w-4" /></div>
                     <div className="flex flex-col">
@@ -320,7 +370,6 @@ const Students = () => {
                     </div>
                   </div>
 
-                  {/* Row 3 */}
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-pink-100 text-pink-700 rounded-full"><CalendarIcon className="h-4 w-4" /></div>
                     <div className="flex flex-col">
@@ -329,7 +378,6 @@ const Students = () => {
                     </div>
                   </div>
 
-                  {/* Row 4 */}
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-100 text-purple-700 rounded-full"><Mail className="h-4 w-4" /></div>
                     <div className="flex flex-col">
@@ -338,7 +386,6 @@ const Students = () => {
                     </div>
                   </div>
                   
-                  {/* Row 5 */}
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-green-100 text-green-700 rounded-full"><Phone className="h-4 w-4" /></div>
                     <div className="flex flex-col">
@@ -347,7 +394,6 @@ const Students = () => {
                     </div>
                   </div>
 
-                  {/* Row 6 */}
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-teal-100 text-teal-700 rounded-full"><Users className="h-4 w-4" /></div>
                     <div className="flex flex-col">
@@ -356,7 +402,6 @@ const Students = () => {
                     </div>
                   </div>
 
-                  {/* Row 7 */}
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-yellow-100 text-yellow-700 rounded-full"><CreditCard className="h-4 w-4" /></div>
                     <div className="flex flex-col">
@@ -365,7 +410,6 @@ const Students = () => {
                     </div>
                   </div>
                   
-                  {/* Row 8 */}
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-orange-100 text-orange-700 rounded-full"><MapPin className="h-4 w-4" /></div>
                     <div className="flex flex-col">
