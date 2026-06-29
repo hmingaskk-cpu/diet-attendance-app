@@ -24,6 +24,10 @@ const editStudentFormSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phoneNumber: z.string().optional().or(z.literal("")),
   address: z.string().optional().or(z.literal("")),
+  qualification: z.string().optional().or(z.literal("")),
+  dateOfBirth: z.string().optional().or(z.literal("")),
+  parentName: z.string().optional().or(z.literal("")),
+  aadhaarNumber: z.string().optional().or(z.literal("")),
   semesterId: z.string().min(1),
   optionalSubject4th: z.string().optional().default("none"),
   optionalSubject2nd_1: z.string().optional().default("none"),
@@ -52,8 +56,9 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
   const form = useForm<EditStudentFormValues>({
     resolver: zodResolver(editStudentFormSchema),
     defaultValues: {
-      name: "", rollNumber: "", email: "", phoneNumber: "", address: "", semesterId: "",
-      optionalSubject4th: "none", optionalSubject2nd_1: "none", optionalSubject2nd_2: "none",
+      name: "", rollNumber: "", email: "", phoneNumber: "", address: "", 
+      qualification: "", dateOfBirth: "", parentName: "", aadhaarNumber: "",
+      semesterId: "", optionalSubject4th: "none", optionalSubject2nd_1: "none", optionalSubject2nd_2: "none",
     },
   });
 
@@ -75,10 +80,12 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
     if (isOpen) {
       fetchData();
       if (student) {
-        setPhotoUrl(student.profile_photo_url || null); // Load existing photo
+        setPhotoUrl(student.profile_photo_url || null);
         form.reset({
           name: student.name || "", rollNumber: student.roll_number || "", email: student.email || "",
           phoneNumber: student.phone_number || "", address: student.address || "",
+          qualification: student.qualification || "", dateOfBirth: student.date_of_birth || "",
+          parentName: student.parent_name || "", aadhaarNumber: student.aadhaar_number || "",
           semesterId: student.semester_id?.toString() || "",
           optionalSubject4th: "none", optionalSubject2nd_1: "none", optionalSubject2nd_2: "none",
         });
@@ -135,8 +142,10 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
       await updateStudent(student.id, {
         name: values.name, roll_number: values.rollNumber, email: values.email || null,
         phone_number: values.phoneNumber || null, address: values.address || null,
+        qualification: values.qualification || null, date_of_birth: values.dateOfBirth || null,
+        parent_name: values.parentName || null, aadhaar_number: values.aadhaarNumber || null,
         semester_id: parseInt(values.semesterId), updated_at: new Date().toISOString(),
-        profile_photo_url: photoUrl // Save the URL!
+        profile_photo_url: photoUrl 
       });
 
       await supabase.from('student_subjects').delete().eq('student_id', student.id);
@@ -165,13 +174,12 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Student</DialogTitle>
           <DialogDescription>Update the details for {student?.name}. Click save when you're done.</DialogDescription>
         </DialogHeader>
 
-        {/* Custom Profile Photo Upload UI */}
         <div className="flex flex-col items-center gap-3 py-4 border-b">
           <Avatar className="h-20 w-20 border-2 border-gray-100 shadow-sm">
             <AvatarImage src={photoUrl || ""} />
@@ -190,12 +198,14 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="grid gap-4 py-4">
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem><FormLabel>Student Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
-              <FormField control={form.control} name="rollNumber" render={({ field }) => (
-                <FormItem><FormLabel>Roll Number</FormLabel><FormControl><Input placeholder="DIET/2023/001" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem><FormLabel>Student Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={form.control} name="rollNumber" render={({ field }) => (
+                  <FormItem><FormLabel>Roll Number</FormLabel><FormControl><Input placeholder="DIET/2023/001" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="email" render={({ field }) => (
@@ -203,6 +213,24 @@ const EditStudentDialog = ({ isOpen, onClose, student, onStudentUpdated }: EditS
                 )}/>
                 <FormField control={form.control} name="phoneNumber" render={({ field }) => (
                   <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" placeholder="1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="qualification" render={({ field }) => (
+                  <FormItem><FormLabel>Qualification</FormLabel><FormControl><Input placeholder="BA, B.Sc..." {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
+                  <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="parentName" render={({ field }) => (
+                  <FormItem><FormLabel>Father/Mother Name</FormLabel><FormControl><Input placeholder="Parent's Name" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={form.control} name="aadhaarNumber" render={({ field }) => (
+                  <FormItem><FormLabel>Aadhaar Number</FormLabel><FormControl><Input placeholder="xxxx xxxx xxxx" {...field} /></FormControl><FormMessage /></FormItem>
                 )}/>
               </div>
 
