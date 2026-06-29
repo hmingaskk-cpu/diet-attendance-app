@@ -24,6 +24,10 @@ const addStudentFormSchema = z.object({
   email: z.string().email().optional().or(z.literal("")), 
   phoneNumber: z.string().optional().or(z.literal("")),
   address: z.string().optional().or(z.literal("")),
+  qualification: z.string().optional().or(z.literal("")),
+  dateOfBirth: z.string().optional().or(z.literal("")),
+  parentName: z.string().optional().or(z.literal("")),
+  aadhaarNumber: z.string().optional().or(z.literal("")),
   semesterId: z.string().min(1, { message: "Please select a semester." }),
   optionalSubject4th: z.string().optional().default("none"),
   optionalSubject2nd_1: z.string().optional().default("none"),
@@ -43,7 +47,6 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Cloudinary State
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
@@ -52,8 +55,9 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
   const form = useForm<AddStudentFormValues>({
     resolver: zodResolver(addStudentFormSchema),
     defaultValues: {
-      name: "", rollNumber: "", email: "", phoneNumber: "", address: "", semesterId: "",
-      optionalSubject4th: "none", optionalSubject2nd_1: "none", optionalSubject2nd_2: "none",
+      name: "", rollNumber: "", email: "", phoneNumber: "", address: "", 
+      qualification: "", dateOfBirth: "", parentName: "", aadhaarNumber: "",
+      semesterId: "", optionalSubject4th: "none", optionalSubject2nd_1: "none", optionalSubject2nd_2: "none",
     },
   });
 
@@ -74,11 +78,10 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
     if (isOpen) {
       fetchData();
       form.reset(); 
-      setPhotoUrl(null); // Reset photo
+      setPhotoUrl(null);
     }
   }, [isOpen, form]);
 
-  // Handle Cloudinary Image Upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -86,10 +89,9 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
     setIsUploadingPhoto(true);
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", "student_profiles"); // Your preset
+    formData.append("upload_preset", "student_profiles"); 
 
     try {
-      // Your specific Cloudinary URL
       const response = await fetch("https://api.cloudinary.com/v1_1/dadkmxvlj/image/upload", {
         method: "POST",
         body: formData,
@@ -117,8 +119,12 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
         email: values.email || null, 
         phone_number: values.phoneNumber || null,
         address: values.address || null,
+        qualification: values.qualification || null,
+        date_of_birth: values.dateOfBirth || null,
+        parent_name: values.parentName || null,
+        aadhaar_number: values.aadhaarNumber || null,
         semester_id: parseInt(values.semesterId),
-        profile_photo_url: photoUrl // Save the URL!
+        profile_photo_url: photoUrl 
       });
 
       const subjectInserts: { student_id: number, semester_id: number, subject_id: number }[] = [];
@@ -145,13 +151,12 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Student</DialogTitle>
           <DialogDescription>Enter details and upload a photo for the new student.</DialogDescription>
         </DialogHeader>
 
-        {/* Custom Profile Photo Upload UI */}
         <div className="flex flex-col items-center gap-3 py-4 border-b">
           <Avatar className="h-20 w-20 border-2 border-gray-100 shadow-sm">
             <AvatarImage src={photoUrl || ""} />
@@ -170,12 +175,14 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="grid gap-4 py-4">
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem><FormLabel>Student Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
-              <FormField control={form.control} name="rollNumber" render={({ field }) => (
-                <FormItem><FormLabel>Roll Number</FormLabel><FormControl><Input placeholder="DIET/2023/001" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem><FormLabel>Student Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={form.control} name="rollNumber" render={({ field }) => (
+                  <FormItem><FormLabel>Roll Number</FormLabel><FormControl><Input placeholder="DIET/2023/001" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="email" render={({ field }) => (
@@ -183,6 +190,24 @@ const AddStudentDialog = ({ isOpen, onClose, onStudentAdded }: AddStudentDialogP
                 )}/>
                 <FormField control={form.control} name="phoneNumber" render={({ field }) => (
                   <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" placeholder="1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="qualification" render={({ field }) => (
+                  <FormItem><FormLabel>Qualification</FormLabel><FormControl><Input placeholder="BA, B.Sc..." {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
+                  <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="parentName" render={({ field }) => (
+                  <FormItem><FormLabel>Father/Mother Name</FormLabel><FormControl><Input placeholder="Parent's Name" {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={form.control} name="aadhaarNumber" render={({ field }) => (
+                  <FormItem><FormLabel>Aadhaar Number</FormLabel><FormControl><Input placeholder="xxxx xxxx xxxx" {...field} /></FormControl><FormMessage /></FormItem>
                 )}/>
               </div>
 
