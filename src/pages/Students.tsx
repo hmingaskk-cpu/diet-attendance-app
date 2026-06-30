@@ -250,7 +250,7 @@ const Students = () => {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar className="h-9 w-9 border">
-                              <AvatarImage src={student.profile_photo_url || ""} />
+                              <AvatarImage src={student.profile_photo_url || ""} className="object-cover" />
                               <AvatarFallback className="bg-blue-50 text-blue-700 text-xs">
                                 {student.name.substring(0, 2).toUpperCase()}
                               </AvatarFallback>
@@ -313,9 +313,9 @@ const Students = () => {
           
           {selectedStudentForView && (
             <div className="flex flex-col items-center gap-2 py-4">
-              <Avatar className="h-32 w-32 border-4 border-white shadow-lg mb-2">
-                <AvatarImage src={selectedStudentForView.profile_photo_url || ""} />
-                <AvatarFallback className="bg-blue-50 text-blue-700 text-4xl font-semibold">
+              <Avatar className="h-40 w-40 border-4 border-white shadow-lg mb-2">
+                <AvatarImage src={selectedStudentForView.profile_photo_url || ""} className="object-cover" />
+                <AvatarFallback className="bg-blue-50 text-blue-700 text-5xl font-semibold">
                   {selectedStudentForView.name.substring(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -330,7 +330,7 @@ const Students = () => {
               <div className="w-full space-y-4 mt-2 px-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
                 <div className="grid grid-cols-1 gap-4">
                   
-                  {/* NEW: Live Attendance Row */}
+                  {/* Live Attendance Row */}
                   <div className="flex items-center gap-3 bg-white p-3 rounded-lg border shadow-sm">
                     <div className="p-2 bg-blue-50 text-blue-600 rounded-full"><PieChart className="h-5 w-5" /></div>
                     <div className="flex flex-col flex-1">
