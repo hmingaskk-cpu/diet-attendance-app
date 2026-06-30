@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import Papa from "papaparse";
-import { createMultipleStudents, getSemesters, Semester } from "@/lib/db";
+import { createMultipleStudents, Semester } from "@/lib/db";
 import { supabase } from "@/lib/supabaseClient";
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ImportStudentsDialogProps {
   isOpen: boolean;
@@ -18,228 +19,255 @@ interface ImportStudentsDialogProps {
 }
 
 const ImportStudentsDialog = ({ isOpen, onClose, onImportComplete }: ImportStudentsDialogProps) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [currentUserRole, setCurrentUserRole] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!isOpen) return;
-
-      try {
-        // Fetch semesters for mapping
-        const fetchedSemesters = await getSemesters();
-        setSemesters(fetchedSemesters);
-
-        // Get current user role for authorization
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: userDetails } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-          if (userDetails) {
-            setCurrentUserRole(userDetails.role);
-          }
-        }
-      } catch (error: any) {
-        toast({
-          title: "Error loading data",
-          description: error.message,
-          variant: "destructive"
-        });
-      }
+    const fetchSemesters = async () => {
+      const { data } = await supabase.from('semesters').select('*').order('id');
+      if (data) setSemesters(data);
     };
-    fetchData();
-  }, [isOpen, toast]);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      const file = event.target.files[0];
-      // Basic file type check
-      if (file.type === "text/csv" || file.name.endsWith(".csv")) {
-        setSelectedFile(file);
-      } else {
-        toast({
-          title: "Unsupported file type",
-          description: "Please upload a CSV file. XLSX is not supported yet.",
-          variant: "destructive"
-        });
-        setSelectedFile(null);
-      }
-    } else {
-      setSelectedFile(null);
+    if (isOpen) {
+      fetchSemesters();
+      resetForm();
     }
+  }, [isOpen]);
+
+  const resetForm = () => {
+    setFile(null);
+    setSelectedSemester("");
+    setError(null);
+    setPreviewData([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleImport = async () => {
-    if (currentUserRole !== "admin") {
-      toast({
-        title: "Access Denied",
-        description: "Only administrators can import student data.",
-        variant: "destructive"
-      });
+  // Helper to accurately parse CSV rows, accounting for commas inside quotes
+  const parseCSVRow = (str: string) => {
+    const arr = [];
+    let quote = false;
+    let cell = '';
+    for (let i = 0; i < str.length; i++) {
+      let c = str[i];
+      if (c === '"' && str[i + 1] === '"') { cell += '"'; i++; } 
+      else if (c === '"') { quote = !quote; }
+      else if (c === ',' && !quote) { arr.push(cell.trim()); cell = ''; }
+      else { cell += c; }
+    }
+    arr.push(cell.trim());
+    return arr.map(val => val.replace(/^"|"$/g, '').trim());
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    setError(null);
+    
+    if (!selectedFile) return;
+    
+    if (selectedFile.type !== "text/csv" && !selectedFile.name.endsWith(".csv")) {
+      setError("Please upload a valid CSV file.");
+      setFile(null);
       return;
     }
 
-    if (!selectedFile) {
-      toast({
-        title: "No file selected",
-        description: "Please select a CSV file to import.",
-        variant: "destructive"
-      });
+    setFile(selectedFile);
+    
+    // Generate a quick preview to ensure data maps correctly
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim() !== '');
+        if (lines.length < 2) throw new Error("File appears to be empty or missing data rows.");
+
+        const headers = parseCSVRow(lines[0].toLowerCase());
+        
+        const parsedPreview = lines.slice(1, 4).map(line => {
+          const values = parseCSVRow(line);
+          const rowData: any = {};
+          
+          headers.forEach((header, index) => {
+            const val = values[index] || "";
+            if (header.includes("roll")) rowData.roll_number = val;
+            else if (header.includes("name") && !header.includes("parent")) rowData.name = val;
+            else if (header.includes("email")) rowData.email = val;
+            else if (header.includes("phone")) rowData.phone_number = val;
+            else if (header.includes("address")) rowData.address = val;
+            else if (header.includes("qual")) rowData.qualification = val;
+            else if (header.includes("dob") || header.includes("birth")) rowData.date_of_birth = val;
+            else if (header.includes("parent") || header.includes("father") || header.includes("mother")) rowData.parent_name = val;
+            else if (header.includes("aadhaar")) rowData.aadhaar_number = val;
+          });
+          return rowData;
+        });
+        
+        setPreviewData(parsedPreview);
+      } catch (err: any) {
+        setError("Could not read file. Ensure it is a standard CSV.");
+      }
+    };
+    reader.readAsText(selectedFile);
+  };
+
+  const handleImport = async () => {
+    if (!file || !selectedSemester) {
+      setError("Please select both a class and a CSV file.");
       return;
     }
 
     setIsLoading(true);
+    setError(null);
 
-    try {
-      const semesterMap = new Map(semesters.map(s => [s.name.toLowerCase(), s.id]));
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim() !== '');
+        
+        if (lines.length < 2) throw new Error("File does not contain valid data rows.");
 
-      Papa.parse(selectedFile, {
-        header: true,
-        skipEmptyLines: true,
-        complete: async (results) => {
-          if (results.errors.length > 0) {
-            toast({
-              title: "CSV Parsing Error",
-              description: results.errors[0].message,
-              variant: "destructive"
-            });
-            setIsLoading(false);
-            return;
-          }
+        const headers = parseCSVRow(lines[0].toLowerCase());
+        const studentsToImport = [];
 
-          const studentsToInsert = [];
-          const errors: string[] = [];
+        for (let i = 1; i < lines.length; i++) {
+          const values = parseCSVRow(lines[i]);
+          const student: any = { semester_id: parseInt(selectedSemester) };
+          let hasName = false;
+          let hasRoll = false;
 
-          for (const row of results.data as any[]) {
-            const name = row["Student Name"] || row["name"];
-            const rollNumber = row["Roll Number"] || row["roll_number"];
-            const email = row["Email"] || row["email"];
-            const semesterName = row["Semester"] || row["semester"];
-
-            if (!name || !rollNumber || !semesterName) {
-              errors.push(`Skipping row due to missing data: Name='${name}', Roll='${rollNumber}', Semester='${semesterName}'`);
-              continue;
+          headers.forEach((header, index) => {
+            const val = values[index] ? values[index].trim() : null;
+            
+            // Map the CSV headers to our Database columns dynamically
+            if (header.includes("roll")) { student.roll_number = val; hasRoll = !!val; }
+            else if (header.includes("name") && !header.includes("parent")) { student.name = val; hasName = !!val; }
+            else if (header.includes("email")) student.email = val || null;
+            else if (header.includes("phone")) student.phone_number = val || null;
+            else if (header.includes("address")) student.address = val || null;
+            else if (header.includes("qual")) student.qualification = val || null;
+            else if (header.includes("dob") || header.includes("birth")) {
+              // Convert dd/mm/yyyy or dd-mm-yyyy to standard DB yyyy-mm-dd if necessary
+              if (val && (val.includes('/') || val.split('-')[0].length === 2)) {
+                 const parts = val.includes('/') ? val.split('/') : val.split('-');
+                 if (parts.length === 3) student.date_of_birth = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                 else student.date_of_birth = val;
+              } else {
+                 student.date_of_birth = val || null;
+              }
             }
-
-            const semesterId = semesterMap.get(semesterName.toLowerCase());
-            if (semesterId === undefined) {
-              errors.push(`Skipping student '${name}' (Roll: ${rollNumber}) due to unknown semester: '${semesterName}'`);
-              continue;
-            }
-
-            studentsToInsert.push({
-              name: String(name),
-              roll_number: String(rollNumber),
-              email: email ? String(email) : null,
-              semester_id: semesterId,
-            });
-          }
-
-          if (errors.length > 0) {
-            toast({
-              title: "Import Warnings/Errors",
-              description: `Some rows were skipped: ${errors.join("; ")}. Please check your CSV file.`,
-              variant: "destructive",
-              duration: 8000
-            });
-          }
-
-          if (studentsToInsert.length === 0) {
-            toast({
-              title: "No Valid Students to Import",
-              description: "No valid student records found in the file after processing.",
-              variant: "destructive"
-            });
-            setIsLoading(false);
-            return;
-          }
-
-          try {
-            await createMultipleStudents(studentsToInsert);
-            toast({
-              title: "Students Imported Successfully",
-              description: `${studentsToInsert.length} student(s) have been added.`,
-            });
-            onImportComplete();
-            onClose();
-          } catch (dbError: any) {
-            toast({
-              title: "Database Import Failed",
-              description: dbError.message || "An error occurred while inserting students into the database.",
-              variant: "destructive"
-            });
-          } finally {
-            setIsLoading(false);
-            setSelectedFile(null);
-          }
-        },
-        error: (err: any) => {
-          toast({
-            title: "File Reading Error",
-            description: err.message,
-            variant: "destructive"
+            else if (header.includes("parent") || header.includes("father") || header.includes("mother")) student.parent_name = val || null;
+            else if (header.includes("aadhaar")) student.aadhaar_number = val || null;
           });
-          setIsLoading(false);
-          setSelectedFile(null);
+
+          if (hasName && hasRoll) {
+            studentsToImport.push(student);
+          }
         }
-      });
-    } catch (error: any) {
-      toast({
-        title: "Import Failed",
-        description: error.message || "An unexpected error occurred during import.",
-        variant: "destructive"
-      });
+
+        if (studentsToImport.length === 0) {
+          throw new Error("No valid students found. Ensure columns 'Roll Number' and 'Name' exist.");
+        }
+
+        await createMultipleStudents(studentsToImport);
+        
+        toast({ title: "Import Successful", description: `Successfully imported ${studentsToImport.length} students.` });
+        onImportComplete();
+        onClose();
+        
+      } catch (err: any) {
+        setError(err.message || "An error occurred during import.");
+        toast({ title: "Import Failed", description: err.message, variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    reader.onerror = () => {
+      setError("Failed to read the file.");
       setIsLoading(false);
-      setSelectedFile(null);
-    }
+    };
+    
+    reader.readAsText(file);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Import Students</DialogTitle>
           <DialogDescription>
-            Upload a CSV file to import student data.
-            <br />
-            <span className="text-red-500">Only administrators can perform this action.</span>
+            Upload a CSV file to bulk add students to a class.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="border-2 border-dashed rounded-lg p-6 text-center">
-            <Upload className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium">
-              {selectedFile ? selectedFile.name : "Drag and drop or click to upload"}
-            </h3>
-            <p className="mt-1 text-xs text-gray-500">
-              Supported format: CSV (XLSX not supported yet)
-            </p>
-            <Label htmlFor="file-upload" className="cursor-pointer">
-              <Input
-                id="file-upload"
-                type="file"
-                className="sr-only"
-                accept=".csv"
+
+        <div className="space-y-6 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="import-semester">Target Class</Label>
+            <Select value={selectedSemester} onValueChange={setSelectedSemester}>
+              <SelectTrigger id="import-semester">
+                <SelectValue placeholder="Select class for imported students" />
+              </SelectTrigger>
+              <SelectContent>
+                {semesters.map(semester => (
+                  <SelectItem key={semester.id} value={semester.id.toString()}>
+                    {semester.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>CSV File</Label>
+            <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 flex flex-col items-center justify-center text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+              <FileSpreadsheet className="h-10 w-10 text-gray-400 mb-2" />
+              <p className="text-sm font-medium text-gray-700">
+                {file ? file.name : "Click to select a CSV file"}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Must include "Roll Number" and "Name" columns.
+              </p>
+              <Input 
+                ref={fileInputRef} type="file" accept=".csv" className="hidden" 
                 onChange={handleFileChange}
               />
-              <Button variant="outline" className="mt-4" asChild>
-                <span>Select File</span>
-              </Button>
-            </Label>
+            </div>
           </div>
-          <p className="text-sm text-gray-500">
-            **CSV Format Hint:** Your CSV should have columns like "Student Name", "Roll Number", "Email", and "Semester". The "Semester" column should match existing semester names (e.g., "1st Semester", "2nd Semester").
-          </p>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {previewData.length > 0 && !error && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <div className="flex items-center gap-2 mb-2 text-blue-800 font-medium text-sm">
+                <CheckCircle2 className="h-4 w-4" /> Data mapped successfully!
+              </div>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p><strong>Previewing first entry:</strong></p>
+                <p>Roll No: {previewData[0].roll_number || "N/A"}</p>
+                <p>Name: {previewData[0].name || "N/A"}</p>
+                <p>Phone: {previewData[0].phone_number || "N/A"}</p>
+                <p>DOB: {previewData[0].date_of_birth || "N/A"}</p>
+              </div>
+            </div>
+          )}
         </div>
+
         <DialogFooter>
-          <Button onClick={handleImport} disabled={isLoading || !selectedFile || currentUserRole !== "admin"}>
-            {isLoading ? "Importing..." : "Import Students"}
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+          <Button onClick={handleImport} disabled={!file || !selectedSemester || isLoading}>
+            <Upload className="mr-2 h-4 w-4" />
+            {isLoading ? "Importing..." : "Import Data"}
           </Button>
         </DialogFooter>
       </DialogContent>
