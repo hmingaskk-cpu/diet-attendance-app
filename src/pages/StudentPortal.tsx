@@ -12,57 +12,66 @@ import { Camera, Lock, UserCheck } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function StudentPortal() {
-  // Step 1: Authentication State
   const [rollNumber, setRollNumber] = useState("");
   const [pin, setPin] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   
-  // Step 2: Form State
   const [student, setStudent] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   const { toast } = useToast();
 
-  // --- LOGIN LOGIC ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthenticating(true);
 
     try {
-      // Find the student by Roll Number and check the PIN
+      // 1. Fetch data without .single() to avoid masking errors
       const { data, error } = await supabase
         .from('students')
         .select('*')
-        .ilike('roll_number', rollNumber.trim())
-        .single();
+        .ilike('roll_number', rollNumber.trim());
 
-      if (error || !data) {
-        throw new Error("Student not found. Please check your Roll Number.");
+      // 2. Check for explicit database/security errors
+      if (error) {
+        throw new Error(`Database Error: ${error.message}`);
       }
 
-      if (data.is_profile_locked) {
+      // 3. Check if the query returned empty (meaning Roll No doesn't exist or RLS blocked it)
+      if (!data || data.length === 0) {
+        throw new Error(`Roll Number '${rollNumber}' not found. (If you are sure it exists, Supabase Security Rules are blocking access)`);
+      }
+
+      const studentData = data[0];
+
+      // 4. Verify columns exist
+      if (studentData.access_pin === undefined) {
+        throw new Error("The 'access_pin' column is missing from your database. Please run the SQL command.");
+      }
+
+      if (studentData.is_profile_locked) {
         throw new Error("This profile has been locked by the administrator.");
       }
 
-      if (data.access_pin !== pin.trim()) {
+      if (studentData.access_pin !== pin.trim()) {
         throw new Error("Incorrect PIN.");
       }
 
       // Success!
-      setStudent(data);
+      setStudent(studentData);
       setIsAuthenticated(true);
-      toast({ title: "Welcome!", description: `Hello, ${data.name}. You can now update your details.` });
+      toast({ title: "Welcome!", description: `Hello, ${studentData.name}. You can now update your details.` });
       
     } catch (error: any) {
+      // THIS WILL NOW SHOW THE EXACT REASON IT FAILED
       toast({ title: "Access Denied", description: error.message, variant: "destructive" });
     } finally {
       setIsAuthenticating(false);
     }
   };
 
-  // --- CLOUDINARY LOGIC ---
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -70,7 +79,7 @@ export default function StudentPortal() {
     setIsUploadingPhoto(true);
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", "student_profiles"); // Your Cloudinary Preset
+    formData.append("upload_preset", "student_profiles"); 
 
     try {
       const response = await fetch("https://api.cloudinary.com/v1_1/dadkmxvlj/image/upload", {
@@ -80,7 +89,6 @@ export default function StudentPortal() {
       const data = await response.json();
       
       if (data.secure_url) {
-        // Instantly save to state
         setStudent({ ...student, profile_photo_url: data.secure_url });
         toast({ title: "Photo Uploaded", description: "Your profile photo has been updated." });
       } else {
@@ -93,7 +101,6 @@ export default function StudentPortal() {
     }
   };
 
-  // --- UPDATE LOGIC ---
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -114,18 +121,17 @@ export default function StudentPortal() {
         })
         .eq('id', student.id);
 
-      if (error) throw error;
+      if (error) throw new Error(`Save Error: ${error.message}`);
 
       toast({ title: "Success!", description: "Your profile has been updated successfully." });
       
-      // Optional: Log them out after saving so the next student can use the device
       setIsAuthenticated(false);
       setRollNumber("");
       setPin("");
       setStudent(null);
       
     } catch (error: any) {
-      toast({ title: "Error", description: "Failed to save details. Please try again.", variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -134,14 +140,11 @@ export default function StudentPortal() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-xl">
-        
-        {/* LOGO / HEADER SECTION */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Student Portal</h1>
           <p className="text-gray-500 mt-2">Update your personal information and profile photo.</p>
         </div>
 
-        {/* STEP 1: AUTHENTICATION (SHOWN IF NOT LOGGED IN) */}
         {!isAuthenticated ? (
           <Card className="shadow-lg">
             <CardHeader>
@@ -178,8 +181,6 @@ export default function StudentPortal() {
             </CardContent>
           </Card>
         ) : (
-
-        /* STEP 2: PROFILE UPDATE FORM (SHOWN IF LOGGED IN) */
           <Card className="shadow-lg border-t-4 border-t-blue-600">
             <CardHeader className="bg-white pb-0">
               <div className="flex justify-between items-start">
@@ -193,7 +194,6 @@ export default function StudentPortal() {
             <CardContent className="pt-6">
               <form onSubmit={handleSave} className="space-y-6">
                 
-                {/* PHOTO UPLOAD */}
                 <div className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
                   <Avatar className="h-24 w-24 border-4 border-white shadow-md">
                     <AvatarImage src={student.profile_photo_url || ""} />
