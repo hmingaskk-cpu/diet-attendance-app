@@ -15,11 +15,12 @@ import SignupForm from "./components/auth/SignupForm";
 import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import StudentPublicReport from "./pages/StudentPublicReport";
+import StudentPortal from "./pages/StudentPortal"; // <-- IMPORTED NEW PORTAL HERE
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
-import AppLayout from "@/components/AppLayout"; // Import the new AppLayout
+import AppLayout from "@/components/AppLayout"; 
 
 const queryClient = new QueryClient();
 
@@ -74,6 +75,9 @@ const AuthenticatedApp = () => {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/update-password" element={<UpdatePassword />} />
       <Route path="/student-public-report" element={<StudentPublicReport />} />
+      
+      {/* ADDED PUBLIC STUDENT PORTAL ROUTE HERE */}
+      <Route path="/update-profile" element={<StudentPortal />} />
       
       {/* Protected Routes wrapped with AppLayout */}
       <Route 
