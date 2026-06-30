@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,43 +13,63 @@ import { Camera, Lock, UserCheck } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function StudentPortal() {
+  // Step 1: Authentication State
+  const [semesters, setSemesters] = useState<any[]>([]);
+  const [selectedClass, setSelectedClass] = useState("");
   const [rollNumber, setRollNumber] = useState("");
   const [pin, setPin] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   
+  // Step 2: Form State
   const [student, setStudent] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   const { toast } = useToast();
 
+  // Fetch the list of classes on page load
+  useEffect(() => {
+    const fetchSemesters = async () => {
+      const { data, error } = await supabase.from('semesters').select('*').order('id');
+      if (data && !error) {
+        setSemesters(data);
+      }
+    };
+    fetchSemesters();
+  }, []);
+
+  // --- LOGIN LOGIC ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!selectedClass) {
+      toast({ title: "Missing Information", description: "Please select your class first.", variant: "destructive" });
+      return;
+    }
+
     setIsAuthenticating(true);
 
     try {
-      // 1. Fetch data without .single() to avoid masking errors
+      // Find the student by BOTH Semester and Roll Number
       const { data, error } = await supabase
         .from('students')
-        .select('*')
+        .select('*, semester:semesters(name)')
+        .eq('semester_id', parseInt(selectedClass))
         .ilike('roll_number', rollNumber.trim());
 
-      // 2. Check for explicit database/security errors
       if (error) {
         throw new Error(`Database Error: ${error.message}`);
       }
 
-      // 3. Check if the query returned empty (meaning Roll No doesn't exist or RLS blocked it)
       if (!data || data.length === 0) {
-        throw new Error(`Roll Number '${rollNumber}' not found. (If you are sure it exists, Supabase Security Rules are blocking access)`);
+        throw new Error(`Roll Number '${rollNumber}' not found in the selected class.`);
       }
 
       const studentData = data[0];
 
-      // 4. Verify columns exist
       if (studentData.access_pin === undefined) {
-        throw new Error("The 'access_pin' column is missing from your database. Please run the SQL command.");
+        throw new Error("The 'access_pin' column is missing from your database.");
       }
 
       if (studentData.is_profile_locked) {
@@ -65,13 +86,13 @@ export default function StudentPortal() {
       toast({ title: "Welcome!", description: `Hello, ${studentData.name}. You can now update your details.` });
       
     } catch (error: any) {
-      // THIS WILL NOW SHOW THE EXACT REASON IT FAILED
       toast({ title: "Access Denied", description: error.message, variant: "destructive" });
     } finally {
       setIsAuthenticating(false);
     }
   };
 
+  // --- CLOUDINARY LOGIC ---
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -101,6 +122,7 @@ export default function StudentPortal() {
     }
   };
 
+  // --- UPDATE LOGIC ---
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -128,6 +150,7 @@ export default function StudentPortal() {
       setIsAuthenticated(false);
       setRollNumber("");
       setPin("");
+      setSelectedClass("");
       setStudent(null);
       
     } catch (error: any) {
@@ -140,19 +163,39 @@ export default function StudentPortal() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-xl">
+        
+        {/* LOGO / HEADER SECTION */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Student Portal</h1>
           <p className="text-gray-500 mt-2">Update your personal information and profile photo.</p>
         </div>
 
+        {/* STEP 1: AUTHENTICATION (SHOWN IF NOT LOGGED IN) */}
         {!isAuthenticated ? (
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5"/> Portal Login</CardTitle>
-              <CardDescription>Enter your Roll Number and PIN provided by the administration.</CardDescription>
+              <CardDescription>Enter your Class, Roll Number, and PIN.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
+                
+                <div className="space-y-2">
+                  <Label htmlFor="class">Select Class</Label>
+                  <Select value={selectedClass} onValueChange={setSelectedClass}>
+                    <SelectTrigger id="class">
+                      <SelectValue placeholder="Choose your current class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {semesters.map(semester => (
+                        <SelectItem key={semester.id} value={semester.id.toString()}>
+                          {semester.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="roll">Roll Number</Label>
                   <Input 
@@ -163,6 +206,7 @@ export default function StudentPortal() {
                     required 
                   />
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="pin">PIN</Label>
                   <Input 
@@ -174,19 +218,24 @@ export default function StudentPortal() {
                     required 
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isAuthenticating}>
+                
+                <Button type="submit" className="w-full mt-2" disabled={isAuthenticating}>
                   {isAuthenticating ? "Verifying..." : "Access My Profile"}
                 </Button>
               </form>
             </CardContent>
           </Card>
         ) : (
+
+        /* STEP 2: PROFILE UPDATE FORM (SHOWN IF LOGGED IN) */
           <Card className="shadow-lg border-t-4 border-t-blue-600">
             <CardHeader className="bg-white pb-0">
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-2xl">{student.name}</CardTitle>
-                  <CardDescription className="font-medium text-blue-600 mt-1">Roll No: {student.roll_number}</CardDescription>
+                  <CardDescription className="font-medium text-blue-600 mt-1">
+                    {student.semester?.name || `Class ID: ${student.semester_id}`} | Roll No: {student.roll_number}
+                  </CardDescription>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setIsAuthenticated(false)}>Logout</Button>
               </div>
@@ -194,6 +243,7 @@ export default function StudentPortal() {
             <CardContent className="pt-6">
               <form onSubmit={handleSave} className="space-y-6">
                 
+                {/* PHOTO UPLOAD */}
                 <div className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
                   <Avatar className="h-24 w-24 border-4 border-white shadow-md">
                     <AvatarImage src={student.profile_photo_url || ""} />
